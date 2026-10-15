@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
+import { toast } from 'react-hot-toast';
 import { api } from '../lib/api';
 import { useAuth } from '../context/useAuth';
 
@@ -39,14 +40,15 @@ export default function RegisterPage() {
     try {
       // Register the user via the API
       await api.post('/auth/register', values);
+      toast.success('Account created successfully! Logging you in...');
       // Auto-login after successful registration
       await login(values.email, values.password);
       navigate('/dashboard', { replace: true });
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? 'Registration failed. Please try again.';
+      const respData = (err as { response?: { data?: { error?: { message?: string }; message?: string } } })?.response?.data;
+      const msg = respData?.error?.message ?? respData?.message ?? 'Registration failed. Please check your details and try again.';
       setApiError(msg);
+      toast.error(msg);
     }
   };
 

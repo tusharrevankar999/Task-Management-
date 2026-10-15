@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
+import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/useAuth';
 
 // ─── Validation schema ───────────────────────────────────────────────────────
@@ -36,12 +37,13 @@ export default function LoginPage() {
     setApiError(null);
     try {
       await login(values.email, values.password);
+      toast.success('Signed in successfully!');
       navigate('/dashboard', { replace: true });
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? 'Invalid credentials. Please try again.';
+      const respData = (err as { response?: { data?: { error?: { message?: string }; message?: string } } })?.response?.data;
+      const msg = respData?.error?.message ?? respData?.message ?? 'Invalid email or password. Please try again.';
       setApiError(msg);
+      toast.error(msg);
     }
   };
 

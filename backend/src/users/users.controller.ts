@@ -56,7 +56,7 @@ export async function createUserHandler(
   try {
     const input = createUserSchema.parse(req.body);
     const user = await usersService.createUser(input);
-    res.status(201).json({ user });
+    res.status(201).json(user);
   } catch (err) {
     next(err);
   }
@@ -73,7 +73,7 @@ export async function updateUserHandler(
     const { id } = req.params;
     const input = updateUserSchema.parse(req.body);
     const user = await usersService.updateUser(id!, input);
-    res.status(200).json({ user });
+    res.status(200).json(user);
   } catch (err) {
     next(err);
   }
@@ -89,7 +89,7 @@ export async function deactivateUserHandler(
   try {
     const { id } = req.params;
     const user = await usersService.deactivateUser(id!);
-    res.status(200).json({ user });
+    res.status(200).json(user);
   } catch (err) {
     next(err);
   }

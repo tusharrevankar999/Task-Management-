@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import AppLayout from './components/AppLayout';
 import { ProtectedRoute, RoleRoute } from './components/RouteGuards';
 import { AuthProvider } from './context/AuthContext';
@@ -11,6 +12,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
         <Routes>
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />

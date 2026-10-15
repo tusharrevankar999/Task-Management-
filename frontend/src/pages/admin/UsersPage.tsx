@@ -11,15 +11,22 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { toast } from 'react-hot-toast';
 import { usersApi } from '../../lib/api';
 import type { CreateUserPayload, UpdateUserPayload, User } from '../../types';
+
+// Helper to normalize user role casing from API
+export const normalizeUser = (u: any): User => ({
+  ...u,
+  role: (u.role?.toLowerCase?.() === 'admin' ? 'admin' : 'user') as 'admin' | 'user',
+});
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
 const createSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().min(8, 'Password must be at least 8 characters (with uppercase, lowercase, number, special char)'),
   role: z.enum(['admin', 'user'] as const),
 });
 
@@ -94,12 +101,14 @@ function CreateUserForm({
     try {
       const payload: CreateUserPayload = values;
       const { data } = await usersApi.create(payload);
-      onSuccess(data);
+      const newUser = normalizeUser(data);
+      toast.success(`User "${newUser.name}" created successfully`);
+      onSuccess(newUser);
     } catch (err: unknown) {
-      setApiError(
-        (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? 'Failed to create user.'
-      );
+      const respData = (err as { response?: { data?: { error?: { message?: string }; message?: string } } })?.response?.data;
+      const msg = respData?.error?.message ?? respData?.message ?? 'Failed to create user. Please check requirements.';
+      setApiError(msg);
+      toast.error(msg);
     }
   };
 
@@ -130,6 +139,7 @@ function CreateUserForm({
         <input id="cu-password" type="password" {...register('password')} placeholder="••••••••"
           className={`input-field pl-4 ${errors.password ? 'input-field-error' : ''}`} />
         {errors.password && <p className="error-text">{errors.password.message}</p>}
+        <p className="text-xs text-gray-500 mt-1">Must be ≥8 chars with uppercase, lowercase, digit, & special char</p>
       </div>
 
       <div>
@@ -181,12 +191,14 @@ function EditUserForm({
     try {
       const payload: UpdateUserPayload = values;
       const { data } = await usersApi.update(user.id, payload);
-      onSuccess(data);
+      const updatedUser = normalizeUser(data);
+      toast.success(`User "${updatedUser.name}" updated successfully`);
+      onSuccess(updatedUser);
     } catch (err: unknown) {
-      setApiError(
-        (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? 'Failed to update user.'
-      );
+      const respData = (err as { response?: { data?: { error?: { message?: string }; message?: string } } })?.response?.data;
+      const msg = respData?.error?.message ?? respData?.message ?? 'Failed to update user.';
+      setApiError(msg);
+      toast.error(msg);
     }
   };
 
@@ -387,8 +399,12 @@ export default function UsersPage() {
   useEffect(() => {
     usersApi
       .list()
-      .then(({ data }) => setUsers(data))
-      .catch(() => setFetchError('Failed to load users. Please try again.'))
+      .then(({ data }) => setUsers(Array.isArray(data) ? data.map(normalizeUser) : []))
+      .catch((err) => {
+        const msg = err?.response?.data?.error?.message ?? 'Failed to load users.';
+        setFetchError(msg);
+        toast.error(msg);
+      })
       .finally(() => setIsLoading(false));
   }, []);
 
@@ -417,10 +433,19 @@ export default function UsersPage() {
     try {
       const payload: UpdateUserPayload = { isActive: !target.isActive };
       const { data } = await usersApi.update(target.id, payload);
-      setUsers((prev) => prev.map((u) => (u.id === data.id ? data : u)));
+      const updatedUser = normalizeUser(data);
+      setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+      toast.success(
+        updatedUser.isActive
+          ? `User "${updatedUser.name}" activated`
+          : `User "${updatedUser.name}" deactivated`
+      );
       closeModal();
-    } catch {
-      setActionError('Action failed. Please try again.');
+    } catch (err: unknown) {
+      const respData = (err as { response?: { data?: { error?: { message?: string }; message?: string } } })?.response?.data;
+      const msg = respData?.error?.message ?? respData?.message ?? 'Action failed. Please try again.';
+      setActionError(msg);
+      toast.error(msg);
     } finally {
       setActionLoading(false);
     }
@@ -434,9 +459,13 @@ export default function UsersPage() {
     try {
       await usersApi.delete(target.id);
       setUsers((prev) => prev.filter((u) => u.id !== target.id));
+      toast.success(`User "${target.name}" deleted successfully`);
       closeModal();
-    } catch {
-      setActionError('Failed to delete user. Please try again.');
+    } catch (err: unknown) {
+      const respData = (err as { response?: { data?: { error?: { message?: string }; message?: string } } })?.response?.data;
+      const msg = respData?.error?.message ?? respData?.message ?? 'Failed to delete user. Please try again.';
+      setActionError(msg);
+      toast.error(msg);
     } finally {
       setActionLoading(false);
     }

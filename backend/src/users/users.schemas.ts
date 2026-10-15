@@ -15,9 +15,11 @@ const passwordSchema = z
 // ─── Create user ─────────────────────────────────────────────
 export const createUserSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
-  email: z.email("Invalid email address"),
+  email: z.string().email("Invalid email address"),
   password: passwordSchema,
-  role: z.enum(["ADMIN", "USER"]).default("USER"),
+  role: z
+    .preprocess((val) => (typeof val === "string" ? val.toUpperCase() : val), z.enum(["ADMIN", "USER"]))
+    .default("USER"),
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;
@@ -26,7 +28,9 @@ export type CreateUserInput = z.infer<typeof createUserSchema>;
 export const updateUserSchema = z
   .object({
     name: z.string().min(1).max(100).optional(),
-    role: z.enum(["ADMIN", "USER"]).optional(),
+    role: z
+      .preprocess((val) => (typeof val === "string" ? val.toUpperCase() : val), z.enum(["ADMIN", "USER"]))
+      .optional(),
     isActive: z.boolean().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {

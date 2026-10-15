@@ -5,7 +5,7 @@ import {
   useState,
 } from 'react';
 import { TOKEN_KEY, authApi } from '../lib/api';
-import type { User } from '../types';
+import type { User, Role } from '../types';
 import { AuthContext } from './AuthContextInstance';
 
 // ─── Provider ───────────────────────────────────────────────────────────────
@@ -35,6 +35,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('auth:logout', handler);
   }, [logout]);
 
+  const normalizeUser = (u: any): User => ({
+    ...u,
+    role: (u.role?.toLowerCase?.() === 'admin' ? 'admin' : 'user') as Role,
+  });
+
   // Restore session on mount — only runs if a token was found
   useEffect(() => {
     if (restored.current) return;
@@ -42,14 +47,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const storedToken = localStorage.getItem(TOKEN_KEY);
     if (!storedToken) {
-      // isLoading was initialised false when no token existed — nothing to do
       return;
     }
 
     authApi
       .me()
       .then(({ data }) => {
-        setUser(data);
+        setUser(normalizeUser(data));
         setToken(storedToken);
       })
       .catch(() => {
@@ -64,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data } = await authApi.login(email, password);
     localStorage.setItem(TOKEN_KEY, data.token);
     setToken(data.token);
-    setUser(data.user);
+    setUser(normalizeUser(data.user));
   }, []);
 
   return (
