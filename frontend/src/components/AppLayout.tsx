@@ -86,7 +86,7 @@ export default function AppLayout() {
               <Shield size={16} className="text-white" />
             </div>
             <span className="font-bold text-gray-900 text-base tracking-tight">
-              AdminPanel
+              Project Management
             </span>
           </div>
           {/* Close button on mobile */}
