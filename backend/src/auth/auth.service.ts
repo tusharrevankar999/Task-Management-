@@ -12,7 +12,7 @@ export interface LoginResult {
 }
 
 export interface SafeUser {
-  id: string;
+  id: number;
   name: string;
   email: string;
   role: Role;
@@ -23,7 +23,6 @@ export interface SafeUser {
 
 // ─── Helpers ─────────────────────────────────────────────────
 
-/** Select clause that deliberately omits passwordHash everywhere. */
 export const safeUserSelect = {
   id: true,
   name: true,
@@ -36,18 +35,6 @@ export const safeUserSelect = {
 
 // ─── Service ─────────────────────────────────────────────────
 
-/**
- * login — verifies credentials and returns a signed token.
- *
- * Security decisions:
- *  - We always run bcrypt.compare even when the user doesn't exist
- *    (using a dummy hash). This prevents timing-based email enumeration:
- *    a failed lookup returns as slowly as a failed password comparison.
- *  - The error message is identical for "email not found" and
- *    "password wrong" — the client cannot distinguish them.
- */
-// Constant-time dummy hash used when no user is found.
-// Generated once at module load; never stored anywhere.
 const DUMMY_HASH =
   "$2b$12$invalidhashpaddingtomimicbcryptcostfactorXXXXXXXXXXXXXX";
 
@@ -57,19 +44,14 @@ export async function login(
 ): Promise<LoginResult> {
   const user = await prisma.user.findUnique({ where: { email } });
 
-  // Always compare so timing is constant regardless of whether email exists.
   const hashToCompare = user?.passwordHash ?? DUMMY_HASH;
   const isMatch = await bcrypt.compare(password, hashToCompare);
 
   if (!user || !isMatch) {
-    // Generic message — intentionally does not reveal whether the email exists.
     throw AppError.unauthorized("Invalid email or password");
   }
 
   if (!user.isActive) {
-    // We reveal "deactivated" only after credentials are verified — otherwise
-    // we would leak that the email exists. At this point the user has already
-    // proven ownership of the account.
     throw AppError.forbidden("Account is deactivated");
   }
 
@@ -88,12 +70,10 @@ export async function login(
   return { token, user: safeUser };
 }
 
-/**
- * getMe — fetches the authenticated user's own profile.
- */
-export async function getMe(userId: string): Promise<SafeUser> {
+export async function getMe(userId: number | string): Promise<SafeUser> {
+  const id = Number(userId);
   const user = await prisma.user.findUnique({
-    where: { id: userId },
+    where: { id },
     select: safeUserSelect,
   });
   if (!user) throw AppError.notFound("User");
@@ -102,9 +82,6 @@ export async function getMe(userId: string): Promise<SafeUser> {
 
 const BCRYPT_ROUNDS = 12;
 
-/**
- * register — creates a new standard USER account with hashed password and returns a token.
- */
 export async function register(
   name: string,
   email: string,
@@ -137,9 +114,6 @@ export async function register(
   return { token, user };
 }
 
-/**
- * forgotPassword — checks database for user, sends recovery email, and reports error if not found.
- */
 export async function forgotPassword(email: string): Promise<void> {
   const user = await prisma.user.findUnique({
     where: { email },
@@ -154,17 +128,14 @@ export async function forgotPassword(email: string): Promise<void> {
     throw AppError.forbidden("This account is currently deactivated. Please contact support.");
   }
 
-  // Generate cryptographic random token
   const crypto = await import("crypto");
   const rawToken = crypto.randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour validity
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
-  // Invalidate any previous reset tokens for this user
   await prisma.passwordResetToken.deleteMany({
     where: { userId: user.id },
   });
 
-  // Save new reset token
   await prisma.passwordResetToken.create({
     data: {
       token: rawToken,
@@ -178,7 +149,6 @@ export async function forgotPassword(email: string): Promise<void> {
 
   const resetUrl = `${env.CLIENT_URL}/reset-password?token=${rawToken}`;
 
-  // Send email and re-throw if it fails so API and UI accurately know delivery status
   await sendPasswordResetEmail({
     to: user.email,
     name: user.name,
@@ -187,9 +157,6 @@ export async function forgotPassword(email: string): Promise<void> {
   });
 }
 
-/**
- * resetPasswordWithToken — consumes recovery token and updates password.
- */
 export async function resetPasswordWithToken(
   token: string,
   newPassword: string

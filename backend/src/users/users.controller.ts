@@ -6,8 +6,15 @@ import {
   resetPasswordSchema,
   listUsersQuerySchema,
 } from "./users.schemas.js";
+import { AppError } from "../errors/AppError.js";
 
-// ─── List users ──────────────────────────────────────────────
+function parseUserId(rawId: string | undefined): number {
+  const id = Number(rawId);
+  if (!rawId || isNaN(id) || !Number.isInteger(id) || id <= 0) {
+    throw AppError.badRequest("Invalid user ID. Must be a positive integer.");
+  }
+  return id;
+}
 
 export async function listUsersHandler(
   req: Request,
@@ -17,12 +24,9 @@ export async function listUsersHandler(
   try {
     const query = listUsersQuerySchema.parse(req.query);
     const result = await usersService.listUsers(query);
-    // If the client expects the bare array (e.g. usersApi.list() expecting User[])
-    // we provide result.users when requested or include pagination fields
     if (req.headers["x-paginated"] === "true") {
       res.status(200).json(result);
     } else {
-      // Return bare array for simple frontend consuming api.get<User[]>('/users')
       res.status(200).json(result.users);
     }
   } catch (err) {
@@ -30,23 +34,19 @@ export async function listUsersHandler(
   }
 }
 
-// ─── Get single user ─────────────────────────────────────────
-
 export async function getUserHandler(
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.params;
-    const user = await usersService.getUserById(id!);
+    const id = parseUserId(req.params.id);
+    const user = await usersService.getUserById(id);
     res.status(200).json({ user });
   } catch (err) {
     next(err);
   }
 }
-
-// ─── Create user ─────────────────────────────────────────────
 
 export async function createUserHandler(
   req: Request,
@@ -62,24 +62,20 @@ export async function createUserHandler(
   }
 }
 
-// ─── Update user ─────────────────────────────────────────────
-
 export async function updateUserHandler(
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.params;
+    const id = parseUserId(req.params.id);
     const input = updateUserSchema.parse(req.body);
-    const user = await usersService.updateUser(id!, input);
+    const user = await usersService.updateUser(id, input);
     res.status(200).json(user);
   } catch (err) {
     next(err);
   }
 }
-
-// ─── Deactivate user (soft-delete) ───────────────────────────
 
 export async function deactivateUserHandler(
   req: Request,
@@ -87,15 +83,13 @@ export async function deactivateUserHandler(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.params;
-    const user = await usersService.deactivateUser(id!);
+    const id = parseUserId(req.params.id);
+    const user = await usersService.deactivateUser(id);
     res.status(200).json(user);
   } catch (err) {
     next(err);
   }
 }
-
-// ─── Delete user (hard-delete) ───────────────────────────────
 
 export async function deleteUserHandler(
   req: Request,
@@ -103,15 +97,13 @@ export async function deleteUserHandler(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.params;
-    await usersService.deleteUser(id!);
+    const id = parseUserId(req.params.id);
+    await usersService.deleteUser(id);
     res.status(204).send();
   } catch (err) {
     next(err);
   }
 }
-
-// ─── Reset password ──────────────────────────────────────────
 
 export async function resetPasswordHandler(
   req: Request,
@@ -119,9 +111,9 @@ export async function resetPasswordHandler(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.params;
+    const id = parseUserId(req.params.id);
     const input = resetPasswordSchema.parse(req.body);
-    await usersService.resetPassword(id!, input);
+    await usersService.resetPassword(id, input);
     res.status(200).json({ message: "Password reset successfully" });
   } catch (err) {
     next(err);

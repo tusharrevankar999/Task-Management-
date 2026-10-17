@@ -16,7 +16,7 @@ enum Role {
 }
 
 model User {
-  id           String   @id @default(cuid())
+  id           Int      @id @default(autoincrement())
   name         String
   email        String   @unique
   passwordHash String
@@ -25,18 +25,51 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  resetTokens  PasswordResetToken[]
+  resetTokens        PasswordResetToken[]
+  assignedProjects   Project[]            @relation("AssignedProjects")
+  createdProjects    Project[]            @relation("CreatedProjects")
+  projectMemberships ProjectMember[]
 
   @@map("users")
 }
 
 model PasswordResetToken {
-  id        String   @id @default(cuid())
+  id        Int      @id @default(autoincrement())
   token     String   @unique
-  userId    String
+  userId    Int
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
 
   @@map("password_reset_tokens")
+}
+
+model Project {
+  id           Int             @id @default(autoincrement())
+  name         String
+  description  String?
+  isActive     Boolean         @default(true)
+  startDate    DateTime?
+  endDate      DateTime?
+  assignedToId Int?
+  assignedTo   User?           @relation("AssignedProjects", fields: [assignedToId], references: [id], onDelete: SetNull)
+  members      ProjectMember[]
+  createdById  Int
+  createdBy    User            @relation("CreatedProjects", fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@map("projects")
+}
+
+model ProjectMember {
+  id        Int      @id @default(autoincrement())
+  projectId Int
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, userId])
+  @@map("project_members")
 }

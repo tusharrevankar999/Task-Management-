@@ -56,7 +56,7 @@ export const createUser = createAsyncThunk(
 // Update user (admin)
 export const updateUser = createAsyncThunk(
   'users/updateUser',
-  async ({ id, payload }: { id: string; payload: UpdateUserPayload }, { rejectWithValue }) => {
+  async ({ id, payload }: { id: number | string; payload: UpdateUserPayload }, { rejectWithValue }) => {
     try {
       const { data } = await usersApi.update(id, payload);
       return normalizeUser(data);
@@ -73,7 +73,7 @@ export const updateUser = createAsyncThunk(
 // Delete user (admin)
 export const deleteUser = createAsyncThunk(
   'users/deleteUser',
-  async (id: string, { rejectWithValue }) => {
+  async (id: number | string, { rejectWithValue }) => {
     try {
       await usersApi.delete(id);
       return id;
@@ -150,8 +150,8 @@ export const usersSlice = createSlice({
         state.actionLoading = true;
         state.error = null;
       })
-      .addCase(deleteUser.fulfilled, (state, action: PayloadAction<string>) => {
-        state.users = state.users.filter((u) => u.id !== action.payload);
+      .addCase(deleteUser.fulfilled, (state, action: PayloadAction<number | string>) => {
+        state.users = state.users.filter((u) => u.id !== Number(action.payload));
         state.actionLoading = false;
       })
       .addCase(deleteUser.rejected, (state, action) => {

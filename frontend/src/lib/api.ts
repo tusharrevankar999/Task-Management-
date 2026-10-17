@@ -60,14 +60,33 @@ export const usersApi = {
   create: (payload: import('../types').CreateUserPayload) =>
     api.post<import('../types').User>('/users', payload),
 
-  update: (id: string, payload: import('../types').UpdateUserPayload) =>
+  update: (id: number | string, payload: import('../types').UpdateUserPayload) =>
     api.patch<import('../types').User>(`/users/${id}`, payload),
 
-  deactivate: (id: string) =>
+  deactivate: (id: number | string) =>
     api.patch<import('../types').User>(`/users/${id}`, { isActive: false }),
 
-  delete: (id: string) =>
+  delete: (id: number | string) =>
     api.delete(`/users/${id}`),
+};
+
+// ─── Projects endpoints ─────────────────────────────────────────────────────
+
+export const projectsApi = {
+  list: (params?: { search?: string; status?: string }) =>
+    api.get<{ projects: import('../types').Project[] }>('/projects', { params }),
+
+  get: (id: number | string) =>
+    api.get<{ project: import('../types').Project }>(`/projects/${id}`),
+
+  create: (payload: import('../types').CreateProjectPayload) =>
+    api.post<{ project: import('../types').Project }>('/projects', payload),
+
+  update: (id: number | string, payload: import('../types').UpdateProjectPayload) =>
+    api.patch<{ project: import('../types').Project }>(`/projects/${id}`, payload),
+
+  delete: (id: number | string) =>
+    api.delete(`/projects/${id}`),
 };
 
 export { TOKEN_KEY };
