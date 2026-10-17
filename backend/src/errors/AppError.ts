@@ -39,8 +39,8 @@ export class AppError extends Error {
   }
 
   /** 404 Not Found */
-  static notFound(resource = "Resource"): AppError {
-    return new AppError(404, "NOT_FOUND", `${resource} not found`);
+  static notFound(message = "Resource not found"): AppError {
+    return new AppError(404, "NOT_FOUND", message);
   }
 
   /** 409 Conflict */

@@ -43,6 +43,12 @@ export const authApi = {
 
   me: () =>
     api.get<import('../types').User>('/auth/me'),
+
+  forgotPassword: (email: string) =>
+    api.post<{ message: string }>('/auth/forgot-password', { email }),
+
+  resetPassword: (payload: { token: string; password: string }) =>
+    api.post<{ message: string }>('/auth/reset-password', payload),
 };
 
 // ─── Users endpoints (admin) ────────────────────────────────────────────────

@@ -65,3 +65,47 @@ export async function getMeHandler(
     next(err);
   }
 }
+
+/**
+ * POST /api/auth/forgot-password
+ *
+ * Body: { email: string }
+ */
+export async function forgotPasswordHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { forgotPasswordSchema } = await import("./auth.schemas.js");
+    const input = forgotPasswordSchema.parse(req.body);
+    await authService.forgotPassword(input.email);
+    res.status(200).json({
+      message: "Password reset link has been successfully sent to your email address.",
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/auth/reset-password
+ *
+ * Body: { token: string; password: string }
+ */
+export async function resetPasswordConfirmHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { resetPasswordConfirmSchema } = await import("./auth.schemas.js");
+    const input = resetPasswordConfirmSchema.parse(req.body);
+    await authService.resetPasswordWithToken(input.token, input.password);
+    res.status(200).json({
+      message: "Password has been successfully updated. You may now sign in.",
+    });
+  } catch (err) {
+    next(err);
+  }
+}

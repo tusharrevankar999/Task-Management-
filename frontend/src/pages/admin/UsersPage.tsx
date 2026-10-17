@@ -12,21 +12,29 @@ import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { toast } from 'react-hot-toast';
-import { usersApi } from '../../lib/api';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import {
+  fetchUsers,
+  createUser,
+  updateUser,
+  deleteUser,
+} from '../../store/features/users/usersSlice';
 import type { CreateUserPayload, UpdateUserPayload, User } from '../../types';
 
-// Helper to normalize user role casing from API
-export const normalizeUser = (u: any): User => ({
-  ...u,
-  role: (u.role?.toLowerCase?.() === 'admin' ? 'admin' : 'user') as 'admin' | 'user',
-});
+
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
 const createSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email'),
-  password: z.string().min(8, 'Password must be at least 8 characters (with uppercase, lowercase, number, special char)'),
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+    .regex(/[0-9]/, 'Password must contain at least one digit')
+    .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
   role: z.enum(['admin', 'user'] as const),
 });
 
@@ -86,6 +94,7 @@ function CreateUserForm({
   onSuccess: (user: User) => void;
   onClose: () => void;
 }) {
+  const dispatch = useAppDispatch();
   const [apiError, setApiError] = useState<string | null>(null);
   const {
     register,
@@ -100,13 +109,16 @@ function CreateUserForm({
     setApiError(null);
     try {
       const payload: CreateUserPayload = values;
-      const { data } = await usersApi.create(payload);
-      const newUser = normalizeUser(data);
-      toast.success(`User "${newUser.name}" created successfully`);
-      onSuccess(newUser);
-    } catch (err: unknown) {
-      const respData = (err as { response?: { data?: { error?: { message?: string }; message?: string } } })?.response?.data;
-      const msg = respData?.error?.message ?? respData?.message ?? 'Failed to create user. Please check requirements.';
+      const resultAction = await dispatch(createUser(payload));
+      if (createUser.fulfilled.match(resultAction)) {
+        onSuccess(resultAction.payload);
+      } else {
+        const msg = (resultAction.payload as string) || 'Failed to create user. Please check requirements.';
+        setApiError(msg);
+        toast.error(msg);
+      }
+    } catch {
+      const msg = 'Failed to create user. Please check requirements.';
       setApiError(msg);
       toast.error(msg);
     }
@@ -176,6 +188,7 @@ function EditUserForm({
   onSuccess: (updated: User) => void;
   onClose: () => void;
 }) {
+  const dispatch = useAppDispatch();
   const [apiError, setApiError] = useState<string | null>(null);
   const {
     register,
@@ -190,13 +203,16 @@ function EditUserForm({
     setApiError(null);
     try {
       const payload: UpdateUserPayload = values;
-      const { data } = await usersApi.update(user.id, payload);
-      const updatedUser = normalizeUser(data);
-      toast.success(`User "${updatedUser.name}" updated successfully`);
-      onSuccess(updatedUser);
-    } catch (err: unknown) {
-      const respData = (err as { response?: { data?: { error?: { message?: string }; message?: string } } })?.response?.data;
-      const msg = respData?.error?.message ?? respData?.message ?? 'Failed to update user.';
+      const resultAction = await dispatch(updateUser({ id: user.id, payload }));
+      if (updateUser.fulfilled.match(resultAction)) {
+        onSuccess(resultAction.payload);
+      } else {
+        const msg = (resultAction.payload as string) || 'Failed to update user.';
+        setApiError(msg);
+        toast.error(msg);
+      }
+    } catch {
+      const msg = 'Failed to update user.';
       setApiError(msg);
       toast.error(msg);
     }
@@ -386,27 +402,15 @@ type ModalState =
   | null;
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const { users, isLoading, actionLoading, error: sliceError } = useAppSelector((state) => state.users);
   const [modal, setModal] = useState<ModalState>(null);
-  const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // ── Fetch users on mount ────────────────────────────────────────────────
-  // isLoading is initialised to true above; we only need to set it false after fetch
-
+  // ── Fetch users on mount using Redux thunk ──────────────────────────────
   useEffect(() => {
-    usersApi
-      .list()
-      .then(({ data }) => setUsers(Array.isArray(data) ? data.map(normalizeUser) : []))
-      .catch((err) => {
-        const msg = err?.response?.data?.error?.message ?? 'Failed to load users.';
-        setFetchError(msg);
-        toast.error(msg);
-      })
-      .finally(() => setIsLoading(false));
-  }, []);
+    dispatch(fetchUsers());
+  }, [dispatch]);
 
   // ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -415,59 +419,60 @@ export default function UsersPage() {
     setActionError(null);
   };
 
-  const handleCreated = (user: User) => {
-    setUsers((prev) => [user, ...prev]);
+  const handleCreated = (newUser: User) => {
+    toast.success(`User "${newUser.name}" created successfully`);
     closeModal();
   };
 
-  const handleUpdated = (updated: User) => {
-    setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+  const handleUpdated = (updatedUser: User) => {
+    toast.success(`User "${updatedUser.name}" updated successfully`);
     closeModal();
   };
 
   const handleDeactivateConfirm = async () => {
     if (modal?.type !== 'deactivate') return;
     const target = modal.user;
-    setActionLoading(true);
     setActionError(null);
     try {
-      const payload: UpdateUserPayload = { isActive: !target.isActive };
-      const { data } = await usersApi.update(target.id, payload);
-      const updatedUser = normalizeUser(data);
-      setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
-      toast.success(
-        updatedUser.isActive
-          ? `User "${updatedUser.name}" activated`
-          : `User "${updatedUser.name}" deactivated`
+      const resultAction = await dispatch(
+        updateUser({ id: target.id, payload: { isActive: !target.isActive } })
       );
-      closeModal();
-    } catch (err: unknown) {
-      const respData = (err as { response?: { data?: { error?: { message?: string }; message?: string } } })?.response?.data;
-      const msg = respData?.error?.message ?? respData?.message ?? 'Action failed. Please try again.';
-      setActionError(msg);
-      toast.error(msg);
-    } finally {
-      setActionLoading(false);
+      if (updateUser.fulfilled.match(resultAction)) {
+        const updated = resultAction.payload;
+        toast.success(
+          updated.isActive
+            ? `User "${updated.name}" activated`
+            : `User "${updated.name}" deactivated`
+        );
+        closeModal();
+      } else {
+        const msg = (resultAction.payload as string) || 'Action failed. Please try again.';
+        setActionError(msg);
+        toast.error(msg);
+      }
+    } catch {
+      setActionError('Action failed. Please try again.');
+      toast.error('Action failed. Please try again.');
     }
   };
 
   const handleDeleteConfirm = async () => {
     if (modal?.type !== 'delete') return;
     const target = modal.user;
-    setActionLoading(true);
     setActionError(null);
     try {
-      await usersApi.delete(target.id);
-      setUsers((prev) => prev.filter((u) => u.id !== target.id));
-      toast.success(`User "${target.name}" deleted successfully`);
-      closeModal();
-    } catch (err: unknown) {
-      const respData = (err as { response?: { data?: { error?: { message?: string }; message?: string } } })?.response?.data;
-      const msg = respData?.error?.message ?? respData?.message ?? 'Failed to delete user. Please try again.';
-      setActionError(msg);
-      toast.error(msg);
-    } finally {
-      setActionLoading(false);
+      const resultAction = await dispatch(deleteUser(target.id));
+      if (deleteUser.fulfilled.match(resultAction)) {
+        toast.success(`User "${target.name}" deleted successfully`);
+        closeModal();
+      } else {
+        const msg = (resultAction.payload as string) || 'Failed to delete user.';
+        setActionError(msg);
+        toast.error(msg);
+      }
+    } catch {
+      setActionError('Failed to delete user.');
+      toast.error('Failed to delete user.');
     }
   };
 
@@ -514,11 +519,11 @@ export default function UsersPage() {
             <Loader2 size={22} className="animate-spin" />
             <span className="text-sm">Loading users…</span>
           </div>
-        ) : fetchError ? (
+        ) : sliceError ? (
           <div className="text-center py-20">
-            <p className="text-sm text-red-500">{fetchError}</p>
+            <p className="text-sm text-red-500">{sliceError}</p>
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => dispatch(fetchUsers())}
               className="mt-3 text-sm text-gray-600 underline hover:text-gray-900"
             >
               Retry

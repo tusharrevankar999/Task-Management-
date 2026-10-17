@@ -23,4 +23,13 @@ export const env = {
   SEED_ADMIN_NAME: process.env["SEED_ADMIN_NAME"] ?? "Admin User",
   SEED_ADMIN_EMAIL: process.env["SEED_ADMIN_EMAIL"] ?? "admin@example.com",
   SEED_ADMIN_PASSWORD: process.env["SEED_ADMIN_PASSWORD"] ?? "Admin@1234",
+
+  CLIENT_URL: process.env["CLIENT_URL"] ?? "http://localhost:5173",
+
+  // SMTP Mailer (optional: if omitted, nodemailer falls back to Ethereal/Console preview)
+  SMTP_HOST: process.env["SMTP_HOST"],
+  SMTP_PORT: process.env["SMTP_PORT"] ? parseInt(process.env["SMTP_PORT"], 10) : 587,
+  SMTP_USER: process.env["SMTP_USER"],
+  SMTP_PASS: process.env["SMTP_PASS"],
+  SMTP_FROM: process.env["SMTP_FROM"] ?? "Task Management <no-reply@taskmanagement.com>",
 } as const;

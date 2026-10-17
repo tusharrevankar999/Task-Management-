@@ -6,7 +6,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { toast } from 'react-hot-toast';
 import { api } from '../lib/api';
-import { useAuth } from '../context/useAuth';
 
 // ─── Validation schema ───────────────────────────────────────────────────────
 
@@ -22,7 +21,6 @@ type FormValues = z.infer<typeof schema>;
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
@@ -40,10 +38,8 @@ export default function RegisterPage() {
     try {
       // Register the user via the API
       await api.post('/auth/register', values);
-      toast.success('Account created successfully! Logging you in...');
-      // Auto-login after successful registration
-      await login(values.email, values.password);
-      navigate('/dashboard', { replace: true });
+      toast.success('Account created successfully! Please sign in with your credentials.');
+      navigate('/login', { replace: true });
     } catch (err: unknown) {
       const respData = (err as { response?: { data?: { error?: { message?: string }; message?: string } } })?.response?.data;
       const msg = respData?.error?.message ?? respData?.message ?? 'Registration failed. Please check your details and try again.';
