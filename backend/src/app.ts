@@ -8,10 +8,32 @@ const app = express();
 
 // ─── Global middleware ───────────────────────────────────────
 
+const configuredOrigins = (process.env["CORS_ORIGIN"] || "http://localhost:5173")
+  .split(",")
+  .map((o) => o.trim().replace(/\/+$/, ""))
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env["CORS_ORIGIN"] ?? "http://localhost:5173",
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, or Postman)
+      if (!origin) return callback(null, true);
+
+      const normalizedOrigin = origin.replace(/\/+$/, "");
+      if (
+        configuredOrigins.includes("*") ||
+        configuredOrigins.includes(normalizedOrigin) ||
+        configuredOrigins.includes(origin) ||
+        process.env["NODE_ENV"] !== "production"
+      ) {
+        return callback(null, true);
+      }
+
+      callback(new Error(`Not allowed by CORS: ${origin}`));
+    },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
