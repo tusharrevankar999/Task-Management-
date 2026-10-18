@@ -30,6 +30,12 @@ export async function listUsersHandler(
   }
 }
 
+// Helper to safely extract a route param string
+function getParamId(req: Request): string {
+  const id = req.params.id;
+  return Array.isArray(id) ? id[0] ?? "" : id ?? "";
+}
+
 // ─── Get single user ─────────────────────────────────────────
 
 export async function getUserHandler(
@@ -38,8 +44,7 @@ export async function getUserHandler(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.params;
-    const user = await usersService.getUserById(id!);
+    const user = await usersService.getUserById(getParamId(req));
     res.status(200).json({ user });
   } catch (err) {
     next(err);
@@ -70,9 +75,8 @@ export async function updateUserHandler(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.params;
     const input = updateUserSchema.parse(req.body);
-    const user = await usersService.updateUser(id!, input);
+    const user = await usersService.updateUser(getParamId(req), input);
     res.status(200).json(user);
   } catch (err) {
     next(err);
@@ -87,8 +91,7 @@ export async function deactivateUserHandler(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.params;
-    const user = await usersService.deactivateUser(id!);
+    const user = await usersService.deactivateUser(getParamId(req));
     res.status(200).json(user);
   } catch (err) {
     next(err);
@@ -103,8 +106,7 @@ export async function deleteUserHandler(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.params;
-    await usersService.deleteUser(id!);
+    await usersService.deleteUser(getParamId(req));
     res.status(204).send();
   } catch (err) {
     next(err);
@@ -119,9 +121,8 @@ export async function resetPasswordHandler(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.params;
     const input = resetPasswordSchema.parse(req.body);
-    await usersService.resetPassword(id!, input);
+    await usersService.resetPassword(getParamId(req), input);
     res.status(200).json({ message: "Password reset successfully" });
   } catch (err) {
     next(err);

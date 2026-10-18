@@ -51,8 +51,8 @@ export function requireProjectMember(
         return;
       }
 
-      const { projectId } = req.params;
-      if (!projectId) {
+      const projectId = req.params.projectId;
+      if (!projectId || typeof projectId !== "string") {
         throw AppError.badRequest("projectId is required in route params");
       }
 
