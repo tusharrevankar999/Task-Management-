@@ -8,7 +8,8 @@ import {
 } from "./users.schemas.js";
 import { AppError } from "../errors/AppError.js";
 
-function parseUserId(rawId: string | undefined): number {
+function parseUserId(rawId: string | string[] | undefined): number {
+  if (Array.isArray(rawId)) rawId = rawId[0];
   const id = Number(rawId);
   if (!rawId || isNaN(id) || !Number.isInteger(id) || id <= 0) {
     throw AppError.badRequest("Invalid user ID. Must be a positive integer.");

@@ -3,7 +3,8 @@ import * as projectsService from "./projects.service.js";
 import { createProjectSchema, updateProjectSchema } from "./projects.schemas.js";
 import { AppError } from "../errors/AppError.js";
 
-function parseProjectId(rawId: string | undefined): number {
+function parseProjectId(rawId: string | string[] | undefined): number {
+  if (Array.isArray(rawId)) rawId = rawId[0];
   const id = Number(rawId);
   if (!rawId || isNaN(id) || !Number.isInteger(id) || id <= 0) {
     throw AppError.badRequest("Invalid project ID. Must be a positive integer.");
