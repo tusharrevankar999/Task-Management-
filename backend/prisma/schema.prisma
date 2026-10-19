@@ -10,6 +10,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
 enum Role {
   ADMIN
   USER
@@ -29,6 +36,8 @@ model User {
   assignedProjects   Project[]            @relation("AssignedProjects")
   createdProjects    Project[]            @relation("CreatedProjects")
   projectMemberships ProjectMember[]
+  assignedTasks      Task[]               @relation("AssignedTasks")
+  createdTasks       Task[]               @relation("CreatedTasks")
 
   @@map("users")
 }
@@ -54,6 +63,7 @@ model Project {
   assignedToId Int?
   assignedTo   User?           @relation("AssignedProjects", fields: [assignedToId], references: [id], onDelete: SetNull)
   members      ProjectMember[]
+  tasks        Task[]
   createdById  Int
   createdBy    User            @relation("CreatedProjects", fields: [createdById], references: [id], onDelete: Cascade)
   createdAt    DateTime        @default(now())
@@ -72,4 +82,22 @@ model ProjectMember {
 
   @@unique([projectId, userId])
   @@map("project_members")
+}
+
+model Task {
+  id           Int        @id @default(autoincrement())
+  title        String
+  description  String?
+  status       TaskStatus @default(PENDING)
+  position     Int        @default(0)
+  projectId    Int
+  project      Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignedToId Int?
+  assignedTo   User?      @relation("AssignedTasks", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdById  Int
+  createdBy    User       @relation("CreatedTasks", fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@map("tasks")
 }
