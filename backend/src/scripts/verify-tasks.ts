@@ -5,7 +5,7 @@ import { signToken } from "../utils/jwt.js";
 import bcrypt from "bcrypt";
 
 async function runTests() {
-  console.log("🚀 Starting verification tests for Phase 1 Tasks API...\n");
+  console.log("Starting verification tests for Phase 1 Tasks API...\n");
 
   // Clean up any previous test tasks/projects/users created specifically by this test
   const testAdminEmail = "test_admin_phase1@example.com";
