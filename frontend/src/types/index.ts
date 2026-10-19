@@ -3,7 +3,7 @@
 export type Role = 'admin' | 'user';
 
 export interface User {
-  id: string;
+  id: number;
   name: string;
   email: string;
   role: Role;
@@ -38,3 +38,63 @@ export interface UpdateUserPayload {
   role?: Role;
   isActive?: boolean;
 }
+
+// ─── Project types ──────────────────────────────────────────────────────────
+
+export interface ProjectMemberItem {
+  id: number;
+  projectId: number;
+  userId: number;
+  user: {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+  };
+}
+
+export interface Project {
+  id: number;
+  name: string;
+  description?: string | null;
+  isActive: boolean;
+  startDate?: string | null;
+  endDate?: string | null;
+  assignedToId?: number | null;
+  assignedTo?: {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+  } | null;
+  members?: ProjectMemberItem[];
+  createdById: number;
+  createdBy?: {
+    id: number;
+    name: string;
+    email: string;
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateProjectPayload {
+  name: string;
+  description?: string | null;
+  isActive?: boolean;
+  startDate?: string | null;
+  endDate?: string | null;
+  assignedToId?: number | null;
+  assignedUserIds?: number[];
+}
+
+export interface UpdateProjectPayload {
+  name?: string;
+  description?: string | null;
+  isActive?: boolean;
+  startDate?: string | null;
+  endDate?: string | null;
+  assignedToId?: number | null;
+  assignedUserIds?: number[];
+}
+

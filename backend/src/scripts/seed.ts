@@ -1,11 +1,3 @@
-/**
- * Seed script — creates the first ADMIN from environment variables.
- *
- * Run with: npm run seed
- *
- * Safe to run multiple times — upserts on email so it won't create duplicates.
- */
-
 import "dotenv/config";
 import bcrypt from "bcrypt";
 import prisma from "../lib/prisma.js";
@@ -23,8 +15,6 @@ async function seed(): Promise<void> {
   const admin = await prisma.user.upsert({
     where: { email: SEED_ADMIN_EMAIL },
     update: {
-      // If the admin already exists, update name and ensure they're active+ADMIN.
-      // We do NOT update the password on re-seed to avoid overwriting manual changes.
       name: SEED_ADMIN_NAME,
       role: "ADMIN",
       isActive: true,
@@ -50,7 +40,6 @@ async function seed(): Promise<void> {
   console.log(`   Name:  ${admin.name}`);
   console.log(`   Email: ${admin.email}`);
   console.log(`   Role:  ${admin.role}`);
-  console.log("\n⚠️  Change the default password immediately in production!");
 }
 
 seed()

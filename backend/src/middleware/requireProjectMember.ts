@@ -1,39 +1,12 @@
-import type { Request, Response, NextFunction, RequestHandler } from "express";
+import type { Request, Response, NextFunction } from "express";
 import { AppError } from "../errors/AppError.js";
 
-/**
- * GetMembership — an async function you inject from your project layer.
- * It must return true if the given user is a member of the given project.
- *
- * Using dependency injection keeps this middleware completely decoupled from
- * the Project schema so it compiles even before you add projects.
- *
- * Example (once you build the project layer):
- *   import { isMember } from '../projects/projectService.js';
- *   router.get('/projects/:projectId/tasks',
- *     authenticate,
- *     requireProjectMember(isMember),
- *     taskController.list
- *   );
- */
 export type GetMembership = (
-  userId: string,
-  projectId: string
+  userId: number,
+  projectId: number
 ) => Promise<boolean>;
 
-/**
- * requireProjectMember — middleware factory.
- *
- * Behaviour:
- *  - ADMIN: always passes (bypasses membership check).
- *  - USER: calls `getMembership(userId, projectId)` and passes only if true.
- *  - projectId is read from `req.params.projectId`.
- *
- * Must be used AFTER `authenticate`.
- */
-export function requireProjectMember(
-  getMembership: GetMembership
-): RequestHandler {
+export function requireProjectMember(getMembership: GetMembership) {
   return async (
     req: Request,
     _res: Response,
@@ -42,17 +15,16 @@ export function requireProjectMember(
     try {
       const user = req.user;
       if (!user) {
-        throw AppError.unauthorized();
+        throw AppError.unauthorized("Authentication required");
       }
 
-      // ADMINs bypass the membership check entirely
       if (user.role === "ADMIN") {
-        next();
-        return;
+        return next();
       }
 
-      const projectId = req.params.projectId;
-      if (!projectId || typeof projectId !== "string") {
+      const rawProjectId = req.params["projectId"];
+      const projectId = Number(rawProjectId);
+      if (!rawProjectId || isNaN(projectId)) {
         throw AppError.badRequest("projectId is required in route params");
       }
 
