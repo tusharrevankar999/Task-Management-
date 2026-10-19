@@ -13,7 +13,7 @@ async function main(): Promise<void> {
   console.log("✅ Database connected");
 
   app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`Server running on http://localhost:${PORT}`);
     console.log(`   Environment: ${env.NODE_ENV}`);
   });
 }

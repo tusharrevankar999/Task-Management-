@@ -89,4 +89,30 @@ export const projectsApi = {
     api.delete(`/projects/${id}`),
 };
 
+// ─── Tasks endpoints ────────────────────────────────────────────────────────
+
+export const tasksApi = {
+  listAll: (params?: { page?: number; limit?: number; search?: string; status?: string; projectId?: number }) =>
+    api.get<{ data: import('../types').Task[]; pagination: import('../types').PaginationMeta }>('/tasks/all', { params }),
+
+  list: (projectId: number | string) =>
+    api.get<{ data: import('../types').Task[] }>(`/projects/${projectId}/tasks`),
+
+  get: (projectId: number | string, taskId: number | string) =>
+    api.get<{ data: import('../types').Task }>(`/projects/${projectId}/tasks/${taskId}`),
+
+  create: (projectId: number | string, payload: import('../types').CreateTaskPayload) =>
+    api.post<{ data: import('../types').Task }>(`/projects/${projectId}/tasks`, payload),
+
+  update: (
+    projectId: number | string,
+    taskId: number | string,
+    payload: import('../types').UpdateTaskPayload
+  ) =>
+    api.patch<{ data: import('../types').Task }>(`/projects/${projectId}/tasks/${taskId}`, payload),
+
+  delete: (projectId: number | string, taskId: number | string) =>
+    api.delete(`/projects/${projectId}/tasks/${taskId}`),
+};
+
 export { TOKEN_KEY };

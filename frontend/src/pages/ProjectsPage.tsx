@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   Briefcase,
+  CheckSquare,
   Plus,
   Search,
   Users as UsersIcon,
@@ -26,6 +27,7 @@ import {
 } from '../store/features/projects/projectsSlice';
 import { fetchUsers } from '../store/features/users/usersSlice';
 import type { CreateProjectPayload, Project, UpdateProjectPayload } from '../types';
+import ProjectTasksModal from '../components/ProjectTasksModal';
 
 // ─── Zod Schema for Project Form ─────────────────────────────────────────────
 
@@ -393,6 +395,7 @@ export default function ProjectsPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [viewingTasksProject, setViewingTasksProject] = useState<Project | null>(null);
 
   useEffect(() => {
     dispatch(fetchProjects({ status: 'active' }));
@@ -606,6 +609,14 @@ export default function ProjectsPage() {
                       <td className="py-4 px-6 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
+                            onClick={() => setViewingTasksProject(project)}
+                            title="View tasks"
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition flex items-center gap-1 text-xs font-semibold"
+                          >
+                            <CheckSquare size={15} />
+                            <span className="hidden sm:inline">Tasks</span>
+                          </button>
+                          <button
                             onClick={() => handleOpenEditModal(project)}
                             title="View / Edit details"
                             className="p-1.5 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition"
@@ -635,6 +646,15 @@ export default function ProjectsPage() {
             </table>
           </div>
         </div>
+      )}
+
+      {/* Project Tasks Drawer / Modal */}
+      {viewingTasksProject && (
+        <ProjectTasksModal
+          key={viewingTasksProject.id}
+          project={viewingTasksProject}
+          onClose={() => setViewingTasksProject(null)}
+        />
       )}
 
       {/* Slide-over Drawer / Modal for Add & Edit */}

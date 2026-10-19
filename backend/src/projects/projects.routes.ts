@@ -7,11 +7,15 @@ import {
   updateProjectHandler,
   deleteProjectHandler,
 } from "./projects.controller.js";
+import tasksRoutes from "../tasks/tasks.routes.js";
 
 const router = Router();
 
 // All project routes require authentication
 router.use(authenticate);
+
+// Nested tasks routes
+router.use("/:projectId/tasks", tasksRoutes);
 
 router.get("/", listProjectsHandler);
 router.post("/", createProjectHandler);
@@ -20,3 +24,4 @@ router.patch("/:id", updateProjectHandler);
 router.delete("/:id", deleteProjectHandler);
 
 export default router;
+
