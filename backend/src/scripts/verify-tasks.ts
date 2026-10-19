@@ -97,7 +97,7 @@ async function runTests() {
       const res = await fetch(`${baseUrl}/api/projects/${testProject.id}/tasks`, {
         headers: { Authorization: `Bearer ${memberToken}` },
       });
-      const data = await res.json();
+      const data = await res.json() as any;
       assert(res.status === 200 && Array.isArray(data.data) && data.data.length === 0, "Scenario 1: Member can list tasks in accessible project");
     }
 
@@ -106,7 +106,7 @@ async function runTests() {
       const res = await fetch(`${baseUrl}/api/projects/${testProject.id}/tasks`, {
         headers: { Authorization: `Bearer ${outsiderToken}` },
       });
-      const data = await res.json();
+      const data = await res.json() as any;
       assert(res.status === 403 && data.error?.code === "FORBIDDEN", "Scenario 2: Outsider receives 403 Forbidden when listing tasks");
     }
 
@@ -125,7 +125,7 @@ async function runTests() {
           assignedToId: memberUser.id,
         }),
       });
-      const data = await res.json();
+      const data = await res.json() as any;
       createdTaskId = data.data?.id;
       assert(
         res.status === 201 &&
@@ -150,7 +150,7 @@ async function runTests() {
           title: "   ",
         }),
       });
-      const data = await res.json();
+      const data = await res.json() as any;
       assert(res.status === 422 && data.error?.code === "VALIDATION_ERROR", "Scenario 4: Empty or whitespace task title is rejected with 422");
     }
 
@@ -159,13 +159,13 @@ async function runTests() {
       const res = await fetch(`${baseUrl}/api/projects/abc/tasks`, {
         headers: { Authorization: `Bearer ${memberToken}` },
       });
-      const data = await res.json();
+      const data = await res.json() as any;
       assert(res.status === 400 && data.error?.code === "BAD_REQUEST", "Scenario 5: Non-numeric project ID returns 400 Bad Request");
 
       const notFoundRes = await fetch(`${baseUrl}/api/projects/999999/tasks`, {
         headers: { Authorization: `Bearer ${adminToken}` },
       });
-      const notFoundData = await notFoundRes.json();
+      const notFoundData = await notFoundRes.json() as any;
       assert(notFoundRes.status === 404 && notFoundData.error?.code === "NOT_FOUND", "Scenario 5b: Non-existent project ID returns 404 Not Found");
     }
 
@@ -182,7 +182,7 @@ async function runTests() {
           assignedToId: 999999,
         }),
       });
-      const data = await res.json();
+      const data = await res.json() as any;
       assert(res.status === 400 && data.error?.code === "BAD_REQUEST", "Scenario 6: Non-existent assignee is rejected with 400");
     }
 
@@ -199,7 +199,7 @@ async function runTests() {
           assignedToId: outsiderUser.id,
         }),
       });
-      const data = await res.json();
+      const data = await res.json() as any;
       assert(res.status === 400 && data.error?.code === "BAD_REQUEST", "Scenario 7: Assignee not in project is rejected with 400");
     }
 
@@ -219,7 +219,7 @@ async function runTests() {
       const res = await fetch(`${baseUrl}/api/projects/${testProject.id}/tasks`, {
         headers: { Authorization: `Bearer ${adminToken}` },
       });
-      const data = await res.json();
+      const data = await res.json() as any;
       assert(res.status === 200 && data.data?.length === 1 && data.data[0].id === createdTaskId!, "Scenario 9b: Admin can access tasks in project");
     }
 
@@ -236,7 +236,7 @@ async function runTests() {
           description: null,
         }),
       });
-      const data = await res.json();
+      const data = await res.json() as any;
       assert(
         res.status === 201 && data.data?.assignedTo === null && data.data?.title === "Phase 1 Test Task Unassigned",
         "Scenario 10: Unassigned task is created successfully with assignedTo null"
@@ -248,7 +248,7 @@ async function runTests() {
       const res = await fetch(`${baseUrl}/api/projects/${testProject.id}/tasks`, {
         headers: { Authorization: `Bearer ${memberToken}` },
       });
-      const data = await res.json();
+      const data = await res.json() as any;
       const stringified = JSON.stringify(data);
       assert(!stringified.includes("passwordHash") && !stringified.includes("Password123!"), "Scenario 11: No password hash or credential returned in task list");
     }

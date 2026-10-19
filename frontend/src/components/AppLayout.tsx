@@ -1,5 +1,6 @@
 import {
   FolderKanban,
+  ListTodo,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -34,6 +35,11 @@ function NavItems({ onClick }: { onClick?: () => void }) {
       <NavLink to="/projects" className={linkClass} onClick={onClick}>
         <FolderKanban size={18} />
         Projects
+      </NavLink>
+
+      <NavLink to="/tasks" className={linkClass} onClick={onClick}>
+        <ListTodo size={18} />
+        Tasks
       </NavLink>
 
       {user?.role === 'admin' && (

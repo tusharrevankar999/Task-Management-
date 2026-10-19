@@ -9,6 +9,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import UsersPage from './pages/admin/UsersPage';
 import ProjectsPage from './pages/ProjectsPage';
+import TasksPage from './pages/TasksPage';
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
+              <Route path="/tasks" element={<TasksPage />} />
 
               {/* Admin-only routes */}
               <Route element={<RoleRoute allowedRoles={['admin']} />}>

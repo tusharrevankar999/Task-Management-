@@ -98,3 +98,48 @@ export interface UpdateProjectPayload {
   assignedUserIds?: number[];
 }
 
+// ─── Task types ─────────────────────────────────────────────────────────────
+
+export type TaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
+
+export interface TaskAssignee {
+  id: number;
+  name: string;
+}
+
+export interface Task {
+  id: number;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  position?: number;
+  projectId: number;
+  project?: {
+    id: number;
+    name: string;
+  } | null;
+  assignedTo: TaskAssignee | null;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CreateTaskPayload {
+  title: string;
+  description?: string | null;
+  assignedToId?: number | null;
+}
+
+export interface UpdateTaskPayload {
+  title?: string;
+  description?: string | null;
+  status?: TaskStatus;
+  assignedToId?: number | null;
+  position?: number;
+}
+
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
