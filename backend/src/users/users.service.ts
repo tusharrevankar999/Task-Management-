@@ -10,18 +10,7 @@ import type {
 } from "./users.schemas.js";
 import type { SafeUser } from "../auth/auth.service.js";
 
-// ─── Security constant ───────────────────────────────────────
-
-/**
- * bcrypt cost factor.
- *
- * 12 rounds ≈ 300 ms on a modern CPU — slow enough to make brute-force
- * impractical, fast enough not to hurt UX during login/signup.
- * Increase to 13–14 for high-value accounts; never go below 10.
- */
 const BCRYPT_ROUNDS = 12;
-
-// ─── Types ───────────────────────────────────────────────────
 
 export interface PaginatedUsers {
   users: SafeUser[];
@@ -30,8 +19,6 @@ export interface PaginatedUsers {
   limit: number;
   totalPages: number;
 }
-
-// ─── Service functions ───────────────────────────────────────
 
 export async function listUsers(query: ListUsersQuery): Promise<PaginatedUsers> {
   const { page, limit, role, isActive, search } = query;
@@ -68,7 +55,7 @@ export async function listUsers(query: ListUsersQuery): Promise<PaginatedUsers> 
   };
 }
 
-export async function getUserById(id: string): Promise<SafeUser> {
+export async function getUserById(id: number): Promise<SafeUser> {
   const user = await prisma.user.findUnique({
     where: { id },
     select: safeUserSelect,
@@ -78,7 +65,6 @@ export async function getUserById(id: string): Promise<SafeUser> {
 }
 
 export async function createUser(input: CreateUserInput): Promise<SafeUser> {
-  // Check for duplicate email before hashing (cheap check first)
   const existing = await prisma.user.findUnique({
     where: { email: input.email },
     select: { id: true },
@@ -103,10 +89,9 @@ export async function createUser(input: CreateUserInput): Promise<SafeUser> {
 }
 
 export async function updateUser(
-  id: string,
+  id: number,
   input: UpdateUserInput
 ): Promise<SafeUser> {
-  // Ensure the user exists first
   await getUserById(id);
 
   const user = await prisma.user.update({
@@ -122,13 +107,7 @@ export async function updateUser(
   return user;
 }
 
-/**
- * deactivateUser — soft-delete by setting isActive = false.
- *
- * We prefer soft-delete over hard-delete because the userId may be
- * referenced by tasks and audit logs you'll add later.
- */
-export async function deactivateUser(id: string): Promise<SafeUser> {
+export async function deactivateUser(id: number): Promise<SafeUser> {
   await getUserById(id);
   return prisma.user.update({
     where: { id },
@@ -137,24 +116,13 @@ export async function deactivateUser(id: string): Promise<SafeUser> {
   });
 }
 
-/**
- * deleteUser — permanent removal.
- *
- * Use with caution. Exposed as a separate endpoint so the caller
- * must opt in explicitly rather than using the same route as deactivate.
- */
-export async function deleteUser(id: string): Promise<void> {
+export async function deleteUser(id: number): Promise<void> {
   await getUserById(id);
   await prisma.user.delete({ where: { id } });
 }
 
-/**
- * resetPassword — ADMIN-initiated password reset.
- *
- * Hashes the new password with the same cost factor as creation.
- */
 export async function resetPassword(
-  id: string,
+  id: number,
   input: ResetPasswordInput
 ): Promise<void> {
   await getUserById(id);

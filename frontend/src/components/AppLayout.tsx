@@ -1,4 +1,5 @@
 import {
+  FolderKanban,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -8,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { useAuth } from '../context/useAuth';
 
 // ─── Nav items ───────────────────────────────────────────────────────────────
@@ -29,6 +31,11 @@ function NavItems({ onClick }: { onClick?: () => void }) {
         Dashboard
       </NavLink>
 
+      <NavLink to="/projects" className={linkClass} onClick={onClick}>
+        <FolderKanban size={18} />
+        Projects
+      </NavLink>
+
       {user?.role === 'admin' && (
         <NavLink to="/admin/users" className={linkClass} onClick={onClick}>
           <Users size={18} />
@@ -48,6 +55,7 @@ export default function AppLayout() {
 
   const handleLogout = () => {
     logout();
+    toast.success('Logged out successfully');
     navigate('/login', { replace: true });
   };
 
