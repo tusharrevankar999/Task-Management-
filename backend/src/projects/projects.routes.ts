@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authenticate } from "../middleware/authenticate.js";
+import { requireRole } from "../middleware/requireRole.js";
 import {
   listProjectsHandler,
   getProjectHandler,
@@ -18,10 +19,9 @@ router.use(authenticate);
 router.use("/:projectId/tasks", tasksRoutes);
 
 router.get("/", listProjectsHandler);
-router.post("/", createProjectHandler);
+router.post("/", requireRole("ADMIN"), createProjectHandler);
 router.get("/:id", getProjectHandler);
-router.patch("/:id", updateProjectHandler);
-router.delete("/:id", deleteProjectHandler);
+router.patch("/:id", requireRole("ADMIN"), updateProjectHandler);
+router.delete("/:id", requireRole("ADMIN"), deleteProjectHandler);
 
 export default router;
-

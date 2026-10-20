@@ -121,3 +121,10 @@ export const tasksApi = {
 };
 
 export { TOKEN_KEY };
+
+// Notifications API
+export const notificationsApi = {
+  list: () => api.get<{ data: any[] }>('/notifications'),
+  markAsRead: (id: string) => api.patch(`/notifications/${id}/read`),
+  markAllAsRead: () => api.post('/notifications/read-all'),
+};

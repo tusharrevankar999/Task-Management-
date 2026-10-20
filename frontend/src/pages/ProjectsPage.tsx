@@ -7,7 +7,7 @@ import {
   CheckSquare,
   Plus,
   Search,
-  Users as UsersIcon,
+   
   X,
   Edit2,
   Trash2,
@@ -28,6 +28,7 @@ import {
 import { fetchUsers } from '../store/features/users/usersSlice';
 import type { CreateProjectPayload, Project, UpdateProjectPayload } from '../types';
 import ProjectTasksModal from '../components/ProjectTasksModal';
+import { useAuth } from '../context/useAuth';
 
 // ─── Zod Schema for Project Form ─────────────────────────────────────────────
 
@@ -64,7 +65,15 @@ function formatDateRange(startDate?: string | null, endDate?: string | null): st
 
 // ─── Add / Edit Project Slide-over Modal ──────────────────────────────────────
 
-function ProjectModal({ onClose, projectToEdit }: { onClose: () => void; projectToEdit?: Project | null }) {
+function ProjectModal({
+  onClose,
+  projectToEdit,
+  readOnly = false,
+}: {
+  onClose: () => void;
+  projectToEdit?: Project | null;
+  readOnly?: boolean;
+}) {
   const dispatch = useAppDispatch();
   const { users } = useAppSelector((state) => state.users);
 
@@ -84,224 +93,195 @@ function ProjectModal({ onClose, projectToEdit }: { onClose: () => void; project
     formState: { errors, isSubmitting },
   } = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
-    defaultValues: projectToEdit
-      ? {
-          name: projectToEdit.name,
-          description: projectToEdit.description ?? '',
-          isActive: projectToEdit.isActive,
-          startDate: projectToEdit.startDate ? projectToEdit.startDate.slice(0, 10) : '',
-          endDate: projectToEdit.endDate ? projectToEdit.endDate.slice(0, 10) : '',
-        }
-      : {
-          name: '',
-          description: '',
-          isActive: true,
-          startDate: '',
-          endDate: '',
-        },
+    defaultValues: {
+      name: projectToEdit?.name ?? '',
+      description: projectToEdit?.description ?? '',
+      isActive: projectToEdit?.isActive ?? true,
+      startDate: projectToEdit?.startDate ? projectToEdit.startDate.slice(0, 10) : '',
+      endDate: projectToEdit?.endDate ? projectToEdit.endDate.slice(0, 10) : '',
+    },
   });
 
   const toggleUserSelection = (userId: number) => {
+    if (readOnly) return;
     setSelectedUserIds((prev) =>
       prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
     );
   };
 
   const onSubmit = async (values: ProjectFormValues) => {
+    if (readOnly) {
+      onClose();
+      return;
+    }
     setApiError(null);
+
+    const payload: CreateProjectPayload | UpdateProjectPayload = {
+      name: values.name.trim(),
+      description: values.description?.trim() || undefined,
+      isActive: values.isActive,
+      startDate: values.startDate ? new Date(values.startDate).toISOString() : undefined,
+      endDate: values.endDate ? new Date(values.endDate).toISOString() : undefined,
+      assignedUserIds: selectedUserIds,
+    };
+
     try {
       if (projectToEdit) {
-        const payload: UpdateProjectPayload = {
-          name: values.name,
-          description: values.description || null,
-          isActive: values.isActive,
-          startDate: values.startDate || null,
-          endDate: values.endDate || null,
-          assignedUserIds: selectedUserIds,
-          assignedToId: selectedUserIds[0] || null,
-        };
-        const res = await dispatch(updateProject({ id: projectToEdit.id, payload }));
+        const res = await dispatch(
+          updateProject({ id: projectToEdit.id, payload: payload as UpdateProjectPayload })
+        );
         if (updateProject.fulfilled.match(res)) {
-          toast.success('Project updated successfully!');
+          toast.success('Project updated successfully');
           onClose();
         } else {
-          const msg = (res.payload as string) || 'Failed to update project.';
-          setApiError(msg);
-          toast.error(msg);
+          setApiError((res.payload as string) || 'Failed to update project');
         }
       } else {
-        const payload: CreateProjectPayload = {
-          name: values.name,
-          description: values.description || null,
-          isActive: values.isActive,
-          startDate: values.startDate || null,
-          endDate: values.endDate || null,
-          assignedUserIds: selectedUserIds,
-          assignedToId: selectedUserIds[0] || null,
-        };
-        const res = await dispatch(createProject(payload));
+        const res = await dispatch(createProject(payload as CreateProjectPayload));
         if (createProject.fulfilled.match(res)) {
-          toast.success('Project created successfully!');
+          toast.success('Project created successfully');
           onClose();
         } else {
-          const msg = (res.payload as string) || 'Failed to create project.';
-          setApiError(msg);
-          toast.error(msg);
+          setApiError((res.payload as string) || 'Failed to create project');
         }
       }
     } catch {
-      const msg = 'An unexpected error occurred.';
-      setApiError(msg);
-      toast.error(msg);
+      setApiError('An unexpected error occurred. Please try again.');
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-black/40 backdrop-blur-sm transition-opacity">
-      <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-2xl bg-white shadow-2xl flex flex-col">
-          {/* Modal Header */}
-          <div className="flex items-center justify-between px-8 py-6 border-b border-gray-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gray-900 flex items-center justify-center text-white">
+              <Briefcase size={20} />
+            </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900 tracking-tight">
-                {projectToEdit ? 'Edit Project' : 'Add New Project'}
+              <h2 className="text-lg font-bold text-gray-900">
+                {readOnly ? 'Project Details' : projectToEdit ? 'Edit Project' : 'Create New Project'}
               </h2>
-              <p className="text-xs text-gray-400 mt-1">
-                Configure project details, timeline, and assign team members
+              <p className="text-xs text-gray-500">
+                {readOnly
+                  ? 'Overview of project information'
+                  : projectToEdit
+                  ? 'Update project details and user assignments'
+                  : 'Add a new project to your workspace'}
               </p>
             </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-900 p-2 rounded-lg hover:bg-gray-100 transition"
-            >
-              <X size={20} />
-            </button>
           </div>
+          <button
+            onClick={onClose}
+            className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
-          {/* Modal Body */}
-          <form onSubmit={handleSubmit(onSubmit)} className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
-            {apiError && (
-              <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-                {apiError}
-              </div>
-            )}
+        {/* Form Body */}
+        <div className="overflow-y-auto flex-1 p-6">
+          {apiError && (
+            <div className="mb-5 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
+              {apiError}
+            </div>
+          )}
 
-            {/* Section: Project Details */}
+          <form id="project-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {/* Project Name */}
             <div>
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-4">
-                PROJECT DETAILS
-              </p>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                Project Name *
+              </label>
+              <input
+                type="text"
+                disabled={readOnly}
+                placeholder="e.g. Website Redesign Q4"
+                {...register('name')}
+                className={`w-full px-3.5 py-2.5 rounded-xl border text-sm text-gray-900 focus:outline-none transition ${
+                  readOnly ? 'bg-gray-50 text-gray-600' : ''
+                } ${
+                  errors.name
+                    ? 'border-rose-400 focus:border-rose-500 bg-rose-50/20'
+                    : 'border-gray-200 focus:border-gray-900 bg-white'
+                }`}
+              />
+              {errors.name && (
+                <p className="text-xs text-rose-500 mt-1 font-medium">{errors.name.message}</p>
+              )}
+            </div>
 
-              <div className="space-y-4">
-                {/* Project Name */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                    Project / Client Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    {...register('name')}
-                    placeholder="e.g. Acme Corporation, Mobile App v2"
-                    className={`w-full px-4 py-2.5 rounded-lg border text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900/20 focus:border-gray-900 transition ${
-                      errors.name ? 'border-red-500 bg-red-50/20' : 'border-gray-200'
-                    }`}
-                  />
-                  {errors.name && (
-                    <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>
-                  )}
-                </div>
+            {/* Description */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                Description
+              </label>
+              <textarea
+                rows={3}
+                disabled={readOnly}
+                placeholder="Brief summary of the project goals..."
+                {...register('description')}
+                className={`w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-gray-900 focus:outline-none text-sm text-gray-900 transition resize-none ${
+                  readOnly ? 'bg-gray-50 text-gray-600' : ''
+                }`}
+              />
+            </div>
 
-                {/* Description */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                    Project Description (Optional)
-                  </label>
-                  <textarea
-                    {...register('description')}
-                    rows={3}
-                    placeholder="Briefly describe project scope, goals, or milestones..."
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900/20 focus:border-gray-900 transition resize-none"
-                  />
-                </div>
-
-                {/* Active Checkbox Banner */}
-                <label
-                  htmlFor="project-is-active"
-                  className="flex items-center justify-between p-4 rounded-xl border border-gray-200 bg-gray-50/50 hover:bg-gray-50 cursor-pointer transition select-none"
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">
-                      Active Project
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      Uncheck to set project as archived or on-hold
-                    </p>
-                  </div>
-                  <input
-                    id="project-is-active"
-                    type="checkbox"
-                    {...register('isActive')}
-                    className="w-4 h-4 rounded text-gray-900 focus:ring-gray-900 border-gray-300 cursor-pointer accent-gray-900"
-                  />
+            {/* Dates (Start / End) */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                  Start Date
                 </label>
+                <input
+                  type="date"
+                  disabled={readOnly}
+                  {...register('startDate')}
+                  className={`w-full px-3 py-2 rounded-xl border border-gray-200 focus:border-gray-900 focus:outline-none text-xs text-gray-900 ${
+                    readOnly ? 'bg-gray-50 text-gray-600' : ''
+                  }`}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  disabled={readOnly}
+                  {...register('endDate')}
+                  className={`w-full px-3 py-2 rounded-xl border border-gray-200 focus:border-gray-900 focus:outline-none text-xs text-gray-900 ${
+                    readOnly ? 'bg-gray-50 text-gray-600' : ''
+                  }`}
+                />
               </div>
             </div>
 
-            {/* Section: Timeline & Dates */}
+            {/* Status Active toggle */}
             <div className="pt-2">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Start Date */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                    Start Date (Optional)
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="date"
-                      {...register('startDate')}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 focus:border-gray-900 transition"
-                    />
-                  </div>
-                </div>
-
-                {/* End Date */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                    End Date <span className="text-gray-400 font-normal">(Optional)</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="date"
-                      {...register('endDate')}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 focus:border-gray-900 transition"
-                    />
-                  </div>
-                </div>
-              </div>
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  disabled={readOnly}
+                  {...register('isActive')}
+                  className="w-4 h-4 rounded text-gray-900 focus:ring-0 border-gray-300"
+                />
+                <span className="text-xs font-medium text-gray-700">Project is active</span>
+              </label>
             </div>
 
-            {/* Section: Assigned Users (Multiple selection) */}
-            <div className="pt-2">
+            {/* Assigned Users Checklist */}
+            <div className="pt-2 border-t border-gray-100">
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-semibold text-gray-700">
-                  Assign Users ({selectedUserIds.length} selected)
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  Assigned Team Members ({selectedUserIds.length})
                 </label>
-                {selectedUserIds.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedUserIds([])}
-                    className="text-[11px] text-gray-500 hover:text-gray-900 underline"
-                  >
-                    Clear selection
-                  </button>
-                )}
               </div>
 
-              {/* Multi-user picker container */}
-              <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 max-h-56 overflow-y-auto bg-white">
+              <div className="max-h-40 overflow-y-auto space-y-1.5 p-1 border border-gray-100 rounded-xl bg-gray-50/50">
                 {users.length === 0 ? (
-                  <p className="text-xs text-gray-400 p-4 text-center">
-                    No users available
-                  </p>
+                  <p className="text-xs text-gray-400 p-2 text-center">No users available</p>
                 ) : (
                   users.map((u) => {
                     const isSelected = selectedUserIds.includes(u.id);
@@ -309,39 +289,25 @@ function ProjectModal({ onClose, projectToEdit }: { onClose: () => void; project
                       <div
                         key={u.id}
                         onClick={() => toggleUserSelection(u.id)}
-                        className={`flex items-center justify-between p-3 cursor-pointer transition select-none ${
-                          isSelected ? 'bg-gray-50 font-medium' : 'hover:bg-gray-50/70'
+                        className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs cursor-pointer transition select-none ${
+                          isSelected
+                            ? 'bg-blue-50 text-blue-900 border border-blue-200/60 font-medium'
+                            : 'bg-white hover:bg-gray-100/80 text-gray-700 border border-gray-200/60'
                         }`}
                       >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                              isSelected
-                                ? 'bg-gray-900 text-white'
-                                : 'bg-gray-100 text-gray-600'
-                            }`}
-                          >
-                            {u.name
-                              .split(' ')
-                              .map((n) => n[0])
-                              .join('')
-                              .toUpperCase()
-                              .slice(0, 2)}
+                        <div className="flex items-center gap-2 truncate">
+                          <div className="w-5 h-5 rounded-full bg-gray-200 text-gray-700 font-semibold flex items-center justify-center text-[10px] shrink-0">
+                            {u.name.charAt(0).toUpperCase()}
                           </div>
-                          <div>
-                            <p className="text-xs font-semibold text-gray-900">
-                              {u.name}
-                            </p>
-                            <p className="text-[11px] text-gray-400">
-                              {u.email} • {u.role.toUpperCase()}
-                            </p>
-                          </div>
+                          <span className="truncate">{u.name}</span>
+                          <span className="text-[10px] text-gray-400 truncate hidden sm:inline">
+                            ({u.email})
+                          </span>
                         </div>
-
                         <div
-                          className={`w-5 h-5 rounded-md border flex items-center justify-center transition ${
+                          className={`w-4 h-4 rounded flex items-center justify-center border transition ${
                             isSelected
-                              ? 'bg-gray-900 border-gray-900 text-white'
+                              ? 'bg-blue-600 border-blue-600 text-white'
                               : 'border-gray-300 bg-white'
                           }`}
                         >
@@ -352,31 +318,29 @@ function ProjectModal({ onClose, projectToEdit }: { onClose: () => void; project
                   })
                 )}
               </div>
-              <p className="text-[11px] text-gray-400 mt-1.5">
-                Click on any user above to assign or unassign them to this project.
-              </p>
             </div>
 
-            {/* Modal Actions */}
-            <div className="pt-6 border-t border-gray-100 flex items-center justify-end gap-3">
+            {/* Form Actions */}
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100 mt-6">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition"
               >
-                Cancel
+                {readOnly ? 'Close' : 'Cancel'}
               </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="px-6 py-2.5 rounded-xl bg-gray-900 hover:bg-black text-white text-sm font-semibold transition disabled:opacity-50 shadow-sm shadow-gray-900/20"
-              >
-                {isSubmitting
-                  ? 'Saving…'
-                  : projectToEdit
-                  ? 'Update Project'
-                  : 'Save Project'}
-              </button>
+              {!readOnly && (
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gray-900 hover:bg-black text-white text-xs font-semibold transition shadow-xs disabled:opacity-50"
+                >
+                  {isSubmitting ? (
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : null}
+                  <span>{projectToEdit ? 'Save Changes' : 'Create Project'}</span>
+                </button>
+              )}
             </div>
           </form>
         </div>
@@ -388,6 +352,9 @@ function ProjectModal({ onClose, projectToEdit }: { onClose: () => void; project
 // ─── Main Projects Page Component ────────────────────────────────────────────
 
 export default function ProjectsPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+
   const dispatch = useAppDispatch();
   const { items: projects, isLoading, searchQuery } = useAppSelector(
     (state) => state.projects
@@ -395,6 +362,7 @@ export default function ProjectsPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [isReadOnlyModal, setIsReadOnlyModal] = useState(false);
   const [viewingTasksProject, setViewingTasksProject] = useState<Project | null>(null);
 
   useEffect(() => {
@@ -404,15 +372,21 @@ export default function ProjectsPage() {
 
   const handleOpenAddModal = () => {
     setEditingProject(null);
+    setIsReadOnlyModal(false);
     setIsModalOpen(true);
   };
 
-  const handleOpenEditModal = (project: Project) => {
+  const handleOpenEditModal = (project: Project, readOnly = false) => {
     setEditingProject(project);
+    setIsReadOnlyModal(readOnly);
     setIsModalOpen(true);
   };
 
   const handleDelete = async (id: number | string, name: string) => {
+    if (!isAdmin) {
+      toast.error('Only administrators can delete projects');
+      return;
+    }
     if (!window.confirm(`Are you sure you want to delete "${name}"?`)) return;
     try {
       const res = await dispatch(deleteProject(id));
@@ -452,16 +426,18 @@ export default function ProjectsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Add Project Button (Black Theme) */}
-          <button
-            onClick={handleOpenAddModal}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 hover:bg-black text-white text-sm font-semibold shadow-sm shadow-gray-900/20 transition duration-150"
-          >
-            <Plus size={16} />
-            <span>Add Project</span>
-          </button>
-        </div>
+        {/* Add Project Button (Admin Only) */}
+        {isAdmin && (
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleOpenAddModal}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 hover:bg-black text-white text-sm font-semibold shadow-sm shadow-gray-900/20 transition duration-150"
+            >
+              <Plus size={16} />
+              <span>Add Project</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ─── Search Bar ────────────────────────────────────────────────────── */}
@@ -470,143 +446,143 @@ export default function ProjectsPage() {
           <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search projects or members…"
+            placeholder="Search projects or members..."
             value={searchQuery}
             onChange={(e) => dispatch(setSearchQuery(e.target.value))}
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-xs text-gray-800 placeholder-gray-400 bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/20 focus:border-gray-900 transition"
+            className="w-full pl-9 pr-4 py-2 text-xs bg-gray-50 border border-gray-200/80 rounded-xl focus:outline-none focus:bg-white focus:border-gray-900 transition"
           />
         </div>
       </div>
 
-      {/* ─── Projects Content: List Table View ───────────────────────────────── */}
+      {/* ─── Projects Table ─────────────────────────────────────────────────── */}
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-gray-200">
-          <div className="w-8 h-8 border-3 border-gray-900 border-t-transparent rounded-full animate-spin mb-3" />
-          <p className="text-sm font-medium text-gray-500">Loading projects…</p>
+        <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center shadow-xs">
+          <div className="w-8 h-8 border-2 border-gray-900 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-xs text-gray-500">Loading projects...</p>
         </div>
       ) : filteredProjects.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-dashed border-gray-300 text-center px-4">
-          <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-400 mb-4">
-            <Briefcase size={28} />
+        <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center shadow-xs">
+          <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-400 mx-auto mb-3">
+            <Briefcase size={22} />
           </div>
-          <h3 className="text-base font-bold text-gray-800 mb-1">No projects found</h3>
-          <p className="text-xs text-gray-400 max-w-sm mb-6">
-            Get started by adding your first project to manage timelines and team assignments.
+          <h3 className="text-sm font-bold text-gray-900">No projects found</h3>
+          <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
+            {searchQuery
+              ? 'Try modifying your search criteria to find what you are looking for.'
+              : isAdmin
+              ? 'Get started by creating your first project and assigning team members.'
+              : 'You have not been assigned to any projects yet.'}
           </p>
-          <button
-            onClick={handleOpenAddModal}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 hover:bg-black text-white text-xs font-semibold shadow-sm transition"
-          >
-            <Plus size={15} />
-            Add New Project
-          </button>
+          {!searchQuery && isAdmin && (
+            <button
+              onClick={handleOpenAddModal}
+              className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gray-900 text-white text-xs font-semibold hover:bg-black transition"
+            >
+              <Plus size={14} />
+              <span>Create Project</span>
+            </button>
+          )}
         </div>
       ) : (
-        /* List Table View */
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-xs">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/70 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                  <th className="py-3.5 px-6">Project Name</th>
-                  <th className="py-3.5 px-6">Active Period</th>
-                  <th className="py-3.5 px-6">Assigned Users</th>
-                  <th className="py-3.5 px-6">Status</th>
-                  <th className="py-3.5 px-6 text-right">Actions</th>
+                <tr className="border-b border-gray-100 bg-gray-50/75 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                  <th className="py-3.5 px-5">Project Name</th>
+                  <th className="py-3.5 px-4">Active Period</th>
+                  <th className="py-3.5 px-4">Assigned Users</th>
+                  <th className="py-3.5 px-4">Status</th>
+                  <th className="py-3.5 px-5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 text-sm">
+              <tbody className="divide-y divide-gray-100 text-xs text-gray-700">
                 {filteredProjects.map((project) => {
                   const initials = project.name
                     .split(' ')
-                    .map((w) => w[0])
+                    .map((n) => n[0])
                     .join('')
                     .toUpperCase()
                     .slice(0, 2);
 
-                  // Collect all assigned members
-                  const membersList =
-                    project.members && project.members.length > 0
-                      ? project.members.map((m) => m.user)
-                      : project.assignedTo
-                      ? [project.assignedTo]
-                      : [];
+                  const membersList = project.members && project.members.length > 0
+                    ? project.members.map((m) => m.user)
+                    : project.assignedTo
+                    ? [project.assignedTo]
+                    : [];
 
                   return (
                     <tr
                       key={project.id}
-                      className="hover:bg-gray-50/70 transition duration-150 group"
+                      className="hover:bg-gray-50/80 transition duration-150 group"
                     >
-                      {/* Name & Avatar */}
-                      <td className="py-4 px-6">
+                      {/* Name & description */}
+                      <td className="py-3.5 px-5">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-gray-900 text-white font-bold flex items-center justify-center text-xs tracking-wider shrink-0 shadow-xs">
+                          <div className="w-9 h-9 rounded-xl bg-gray-900 text-white flex items-center justify-center font-bold text-xs shrink-0 tracking-tight">
                             {initials}
                           </div>
                           <div className="min-w-0">
                             <p className="font-semibold text-gray-900 truncate">
                               {project.name}
                             </p>
-                            {project.description && (
-                              <p className="text-xs text-gray-400 truncate max-w-xs">
+                            {project.description ? (
+                              <p className="text-[11px] text-gray-400 truncate max-w-xs mt-0.5">
                                 {project.description}
                               </p>
-                            )}
+                            ) : null}
                           </div>
                         </div>
                       </td>
 
-                      {/* Active Period */}
-                      <td className="py-4 px-6 text-xs text-gray-600 font-medium">
+                      {/* Timeline */}
+                      <td className="py-3.5 px-4 text-gray-500 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
-                          <Clock size={13} className="text-gray-400" />
+                          <Clock size={13} className="text-gray-400 shrink-0" />
                           <span>{formatDateRange(project.startDate, project.endDate)}</span>
                         </div>
                       </td>
 
-                      {/* Assigned Users (Badges/Avatars) */}
-                      <td className="py-4 px-6 text-xs text-gray-700">
+                      {/* Assigned Users Avatars / Pill */}
+                      <td className="py-3.5 px-4">
                         {membersList.length > 0 ? (
-                          <div className="flex flex-wrap items-center gap-1.5 max-w-xs">
+                          <div className="flex items-center gap-1 flex-wrap">
                             {membersList.slice(0, 3).map((u) => (
                               <span
                                 key={u.id}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-100 text-gray-800 text-[11px] font-medium border border-gray-200"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-gray-100 text-gray-700 font-medium"
                               >
-                                <span className="w-1.5 h-1.5 rounded-full bg-gray-900" />
+                                <span className="w-1.5 h-1.5 rounded-full bg-gray-500" />
                                 {u.name}
                               </span>
                             ))}
                             {membersList.length > 3 && (
-                              <span className="text-[11px] font-semibold text-gray-500 px-1.5 py-0.5 rounded-md bg-gray-100">
+                              <span className="text-[10px] text-gray-400 font-medium ml-1">
                                 +{membersList.length - 3} more
                               </span>
                             )}
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1.5 text-gray-400 italic">
-                            <UsersIcon size={14} />
-                            <span>Unassigned</span>
-                          </div>
+                          <span className="text-[11px] text-gray-400 italic">Unassigned</span>
                         )}
                       </td>
 
                       {/* Status */}
-                      <td className="py-4 px-6">
+                      <td className="py-3.5 px-4 whitespace-nowrap">
                         {project.isActive ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <CheckCircle2 size={12} />
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 size={12} className="text-emerald-500" />
                             Active
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
                             Archived
                           </span>
                         )}
                       </td>
 
                       {/* Actions */}
-                      <td className="py-4 px-6 text-right">
+                      <td className="py-3.5 px-5 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => setViewingTasksProject(project)}
@@ -617,26 +593,30 @@ export default function ProjectsPage() {
                             <span className="hidden sm:inline">Tasks</span>
                           </button>
                           <button
-                            onClick={() => handleOpenEditModal(project)}
-                            title="View / Edit details"
+                            onClick={() => handleOpenEditModal(project, true)}
+                            title="View details"
                             className="p-1.5 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition"
                           >
                             <Eye size={16} />
                           </button>
-                          <button
-                            onClick={() => handleOpenEditModal(project)}
-                            title="Edit project"
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition"
-                          >
-                            <Edit2 size={15} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(project.id, project.name)}
-                            title="Delete project"
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                          {isAdmin && (
+                            <>
+                              <button
+                                onClick={() => handleOpenEditModal(project, false)}
+                                title="Edit project"
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition"
+                              >
+                                <Edit2 size={15} />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(project.id, project.name)}
+                                title="Delete project"
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -651,18 +631,17 @@ export default function ProjectsPage() {
       {/* Project Tasks Drawer / Modal */}
       {viewingTasksProject && (
         <ProjectTasksModal
-          key={viewingTasksProject.id}
           project={viewingTasksProject}
           onClose={() => setViewingTasksProject(null)}
         />
       )}
 
-      {/* Slide-over Drawer / Modal for Add & Edit */}
+      {/* Slide-over Modal for Add / Edit Project */}
       {isModalOpen && (
         <ProjectModal
-          key={editingProject ? editingProject.id : 'new-project'}
           onClose={() => setIsModalOpen(false)}
           projectToEdit={editingProject}
+          readOnly={isReadOnlyModal}
         />
       )}
     </div>

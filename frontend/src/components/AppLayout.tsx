@@ -7,11 +7,22 @@ import {
   Shield,
   Users,
   X,
+  Wifi,
+  WifiOff,
+  Bell,
+  CheckCircle2,
+  UserCheck,
+  RefreshCw,
+  ArrowUpDown,
+  Trash2,
+  Check,
+  FolderPlus,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/useAuth';
+import { useSocket } from '../context/SocketContext';
 
 // ─── Nav items ───────────────────────────────────────────────────────────────
 
@@ -56,8 +67,30 @@ function NavItems({ onClick }: { onClick?: () => void }) {
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
+  const {
+    isConnected,
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    clearNotifications,
+  } = useSocket();
+
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [bellOpen, setBellOpen] = useState(false);
+  const bellRef = useRef<HTMLDivElement>(null);
+
+  // Close notifications dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (bellRef.current && !bellRef.current.contains(event.target as Node)) {
+        setBellOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -73,6 +106,24 @@ export default function AppLayout() {
         .toUpperCase()
         .slice(0, 2)
     : 'U';
+
+  const getActionIcon = (action: string) => {
+    switch (action) {
+      case 'COMPLETED':
+        return <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />;
+      case 'ASSIGNED':
+      case 'PROJECT_ASSIGNED':
+        return <UserCheck size={16} className="text-blue-500 shrink-0" />;
+      case 'PROJECT_CREATED':
+        return <FolderPlus size={16} className="text-indigo-500 shrink-0" />;
+      case 'REORDERED':
+        return <ArrowUpDown size={16} className="text-indigo-500 shrink-0" />;
+      case 'DELETED':
+        return <Trash2 size={16} className="text-rose-500 shrink-0" />;
+      default:
+        return <RefreshCw size={16} className="text-amber-500 shrink-0" />;
+    }
+  };
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
@@ -148,7 +199,7 @@ export default function AppLayout() {
       {/* ── Main content ─────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top header bar */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center gap-4 px-4 md:px-6 shrink-0">
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center gap-3 px-4 md:px-6 shrink-0 relative">
           {/* Hamburger – mobile only */}
           <button
             id="sidebar-open"
@@ -159,6 +210,135 @@ export default function AppLayout() {
           </button>
 
           <div className="flex-1" />
+
+          {/* Real-time Connection Indicator */}
+          <div
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
+              isConnected
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : 'bg-amber-50 text-amber-700 border-amber-200'
+            }`}
+            title={isConnected ? 'Live real-time socket connected' : 'Connecting to live updates...'}
+          >
+            {isConnected ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <Wifi size={13} className="text-emerald-600 hidden sm:inline" />
+                <span>Live</span>
+              </>
+            ) : (
+              <>
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                <WifiOff size={13} className="text-amber-600 hidden sm:inline" />
+                <span>Connecting</span>
+              </>
+            )}
+          </div>
+
+          {/* Notification Bell Dropdown */}
+          <div className="relative" ref={bellRef}>
+            <button
+              id="notification-bell-btn"
+              onClick={() => setBellOpen(!bellOpen)}
+              className="relative p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors focus:outline-none"
+              title="Notifications"
+            >
+              <Bell size={19} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-5 h-5 px-1 text-[11px] font-bold text-white bg-rose-500 rounded-full ring-2 ring-white animate-pulse">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
+
+            {/* Notification Menu Popup */}
+            {bellOpen && (
+              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-2xl border border-gray-100 py-2 z-50 animate-in fade-in zoom-in-95 duration-100">
+                <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-gray-900 text-sm">Notifications</span>
+                    {unreadCount > 0 && (
+                      <span className="bg-rose-100 text-rose-700 text-xs px-2 py-0.5 rounded-full font-medium">
+                        {unreadCount} new
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={markAllAsRead}
+                        className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+                        title="Mark all as read"
+                      >
+                        <Check size={12} />
+                        Read all
+                      </button>
+                    )}
+                    {notifications.length > 0 && (
+                      <button
+                        onClick={clearNotifications}
+                        className="text-xs text-gray-400 hover:text-gray-600"
+                        title="Clear all"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Notification Items List */}
+                <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
+                  {notifications.length === 0 ? (
+                    <div className="px-4 py-8 text-center">
+                      <Bell size={28} className="mx-auto text-gray-300 mb-2" />
+                      <p className="text-sm text-gray-500 font-medium">No notifications yet</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Real-time updates will appear here.
+                      </p>
+                    </div>
+                  ) : (
+                    notifications.map((item) => (
+                      <div
+                        key={item.id}
+                        onClick={() => markAsRead(item.id)}
+                        className={`px-4 py-3 hover:bg-gray-50 cursor-pointer flex items-start gap-3 transition-colors ${
+                          !item.isRead ? 'bg-blue-50/40' : ''
+                        }`}
+                      >
+                        <div className="mt-0.5">{getActionIcon(item.action)}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-gray-900 truncate">
+                            {item.action === 'COMPLETED' && 'Task Completed'}
+                            {item.action === 'ASSIGNED' && 'Task Assigned'}
+                            {item.action === 'PROJECT_ASSIGNED' && 'Project Assigned'}
+                            {item.action === 'PROJECT_CREATED' && 'New Project'}
+                            {item.action === 'REORDERED' && 'Tasks Reordered'}
+                            {item.action === 'DELETED' && 'Deleted'}
+                            {item.action === 'UPDATED' && 'Updated'}
+                            {item.action === 'CREATED' && 'New Task Created'}
+                          </p>
+                          <p className="text-xs text-gray-600 mt-0.5 leading-snug break-words">
+                            {item.message}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] text-gray-400">{item.timestamp}</span>
+                            {item.projectName && item.action !== 'PROJECT_ASSIGNED' && (
+                              <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded font-medium truncate max-w-[120px]">
+                                {item.projectName}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {!item.isRead && (
+                          <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0 mt-1.5" />
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Role badge in header */}
           {user?.role === 'admin' ? (
