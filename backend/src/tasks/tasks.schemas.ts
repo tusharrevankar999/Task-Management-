@@ -63,3 +63,11 @@ export const updateTaskSchema = z
   });
 
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
+
+export const reorderTasksSchema = z.object({
+  taskIds: z
+    .array(z.coerce.number().int().positive())
+    .min(1, "taskIds must contain at least one task ID"),
+});
+
+export type ReorderTasksInput = z.infer<typeof reorderTasksSchema>;

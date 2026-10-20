@@ -1,4 +1,4 @@
-import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
+import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { tasksApi } from '../../../lib/api';
 import type { CreateTaskPayload, PaginationMeta, Task, UpdateTaskPayload } from '../../../types';
 
@@ -9,6 +9,7 @@ interface TasksState {
   isLoading: boolean;
   isCreating: boolean;
   isUpdating: boolean;
+  isReordering: boolean;
   error: string | null;
 }
 
@@ -24,6 +25,7 @@ const initialState: TasksState = {
   isLoading: false,
   isCreating: false,
   isUpdating: false,
+  isReordering: false,
   error: null,
 };
 
@@ -113,6 +115,25 @@ export const updateTask = createAsyncThunk(
   }
 );
 
+export const reorderTasks = createAsyncThunk(
+  'tasks/reorderTasks',
+  async (
+    { taskIds, projectId }: { taskIds: number[]; projectId?: number },
+    { rejectWithValue }
+  ) => {
+    try {
+      const { data } = await tasksApi.reorder(taskIds, projectId);
+      return data;
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.error?.message ??
+        err?.response?.data?.message ??
+        'Failed to reorder tasks.';
+      return rejectWithValue(msg);
+    }
+  }
+);
+
 export const deleteTask = createAsyncThunk(
   'tasks/deleteTask',
   async (
@@ -138,6 +159,9 @@ const tasksSlice = createSlice({
   reducers: {
     clearTasksError: (state) => {
       state.error = null;
+    },
+    setAllTasksOrder: (state, action: PayloadAction<Task[]>) => {
+      state.allTasks = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -212,6 +236,18 @@ const tasksSlice = createSlice({
         state.error = action.payload as string;
       })
 
+      // Reorder tasks
+      .addCase(reorderTasks.pending, (state) => {
+        state.isReordering = true;
+      })
+      .addCase(reorderTasks.fulfilled, (state) => {
+        state.isReordering = false;
+      })
+      .addCase(reorderTasks.rejected, (state, action) => {
+        state.isReordering = false;
+        state.error = action.payload as string;
+      })
+
       // Delete task
       .addCase(deleteTask.fulfilled, (state, action) => {
         state.allTasks = state.allTasks.filter((t) => t.id !== action.payload.taskId);
@@ -226,5 +262,5 @@ const tasksSlice = createSlice({
   },
 });
 
-export const { clearTasksError } = tasksSlice.actions;
+export const { clearTasksError, setAllTasksOrder } = tasksSlice.actions;
 export default tasksSlice.reducer;

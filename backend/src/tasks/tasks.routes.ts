@@ -6,6 +6,7 @@ import {
   getTaskHandler,
   createTaskHandler,
   updateTaskHandler,
+  reorderTasksHandler,
   deleteTaskHandler,
 } from "./tasks.controller.js";
 
@@ -15,10 +16,12 @@ router.use(authenticate);
 
 // When mounted directly under /api/tasks:
 router.get("/all", listAllTasksHandler);
+router.put("/reorder", reorderTasksHandler);
 
 // Nested routes under /api/projects/:projectId/tasks:
 router.get("/", listTasksHandler);
 router.post("/", createTaskHandler);
+router.put("/reorder", reorderTasksHandler);
 router.get("/:taskId", getTaskHandler);
 router.patch("/:taskId", updateTaskHandler);
 router.delete("/:taskId", deleteTaskHandler);

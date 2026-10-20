@@ -1,6 +1,6 @@
 import prisma from "../lib/prisma.js";
 import { AppError } from "../errors/AppError.js";
-import type { CreateTaskInput, UpdateTaskInput } from "./tasks.schemas.js";
+import type { CreateTaskInput, UpdateTaskInput, ReorderTasksInput } from "./tasks.schemas.js";
 
 const assigneeSelect = {
   id: true,
@@ -95,7 +95,11 @@ export async function listAllTasks(
       where,
       skip,
       take: limit,
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      orderBy: [
+        { position: "asc" },
+        { createdAt: "desc" },
+        { id: "desc" },
+      ],
       select: {
         id: true,
         title: true,
@@ -222,12 +226,20 @@ export async function createTask(
     }
   }
 
+  // Find current highest position in project to append task at end
+  const highestTask = await prisma.task.findFirst({
+    where: { projectId },
+    orderBy: { position: "desc" },
+    select: { position: true },
+  });
+  const nextPosition = highestTask ? highestTask.position + 1 : 0;
+
   const task = await prisma.task.create({
     data: {
       title: input.title,
       description: input.description ?? null,
       status: "PENDING",
-      position: 0,
+      position: nextPosition,
       projectId,
       createdById: user.id,
       assignedToId: input.assignedToId ?? null,
@@ -316,6 +328,33 @@ export async function updateTask(
   });
 
   return updatedTask;
+}
+
+export async function reorderTasks(
+  user: { id: number; role: string },
+  projectId: number | undefined,
+  input: ReorderTasksInput
+) {
+  if (projectId) {
+    await checkProjectAccess(user, projectId);
+  }
+
+  // Update positions in a transaction
+  return prisma.$transaction(async (tx) => {
+    const updates = input.taskIds.map((taskId, index) =>
+      tx.task.update({
+        where: { id: taskId },
+        data: { position: index },
+        select: {
+          id: true,
+          position: true,
+          projectId: true,
+        },
+      })
+    );
+
+    return Promise.all(updates);
+  });
 }
 
 export async function deleteTask(
