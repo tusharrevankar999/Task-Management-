@@ -1,6 +1,7 @@
 import prisma from "../lib/prisma.js";
 import { AppError } from "../errors/AppError.js";
 import type { CreateProjectInput, UpdateProjectInput } from "./projects.schemas.js";
+import { emitTaskNotification } from "../socket.js";
 
 const userSelect = {
   id: true,
@@ -57,7 +58,10 @@ export async function getProjectById(id: number) {
   return project;
 }
 
-export async function createProject(input: CreateProjectInput, createdById: number) {
+export async function createProject(
+  input: CreateProjectInput,
+  user: { id: number; role?: string; name?: string }
+) {
   const memberUserIds = Array.from(
     new Set([
       ...(input.assignedUserIds ?? []),
@@ -65,7 +69,7 @@ export async function createProject(input: CreateProjectInput, createdById: numb
     ])
   );
 
-  return prisma.project.create({
+  const project = await prisma.project.create({
     data: {
       name: input.name,
       description: input.description,
@@ -73,17 +77,39 @@ export async function createProject(input: CreateProjectInput, createdById: numb
       startDate: input.startDate,
       endDate: input.endDate,
       assignedToId: memberUserIds[0] || null,
-      createdById,
+      createdById: user.id,
       members: {
         create: memberUserIds.map((userId) => ({ userId })),
       },
     },
     include: projectInclude,
   });
+
+  // Emit real-time notification to assigned users and members
+  const recipientUserIds = memberUserIds.filter((uid) => uid !== user.id);
+
+  emitTaskNotification({
+    action: "PROJECT_ASSIGNED",
+    projectId: project.id,
+    projectName: project.name,
+    message: `You were assigned to project "${project.name}"`,
+    updatedBy: {
+      id: user.id,
+      name: user.name || "Admin",
+    },
+    project,
+    recipientUserIds,
+  }).catch((err) => console.error("Failed to emit project notification:", err));
+
+  return project;
 }
 
-export async function updateProject(id: number, input: UpdateProjectInput) {
-  await getProjectById(id);
+export async function updateProject(
+  id: number,
+  input: UpdateProjectInput,
+  user?: { id: number; role?: string; name?: string }
+) {
+  const existingProject = await getProjectById(id);
 
   let memberUserIds: number[] | undefined = undefined;
   if (input.assignedUserIds !== undefined || input.assignedToId !== undefined) {
@@ -95,7 +121,7 @@ export async function updateProject(id: number, input: UpdateProjectInput) {
     );
   }
 
-  return prisma.$transaction(async (tx) => {
+  const updatedProject = await prisma.$transaction(async (tx) => {
     if (memberUserIds !== undefined) {
       await tx.projectMember.deleteMany({ where: { projectId: id } });
       await tx.projectMember.createMany({
@@ -120,6 +146,33 @@ export async function updateProject(id: number, input: UpdateProjectInput) {
       include: projectInclude,
     });
   });
+
+  if (user) {
+    const existingMemberIds = existingProject.members.map((m) => m.userId);
+    const newMemberIds = updatedProject.members.map((m) => m.userId);
+    const newlyAddedIds = newMemberIds.filter((uid) => !existingMemberIds.includes(uid));
+
+    const recipientUserIds = (newlyAddedIds.length > 0 ? newlyAddedIds : newMemberIds).filter(
+      (uid) => uid !== user.id
+    );
+
+    emitTaskNotification({
+      action: newlyAddedIds.length > 0 ? "PROJECT_ASSIGNED" : "UPDATED",
+      projectId: updatedProject.id,
+      projectName: updatedProject.name,
+      message: newlyAddedIds.length > 0
+        ? `You were assigned to project "${updatedProject.name}"`
+        : `Project "${updatedProject.name}" was updated`,
+      updatedBy: {
+        id: user.id,
+        name: user.name || "Admin",
+      },
+      project: updatedProject,
+      recipientUserIds,
+    }).catch((err) => console.error("Failed to emit project update notification:", err));
+  }
+
+  return updatedProject;
 }
 
 export async function deleteProject(id: number) {

@@ -1,6 +1,7 @@
 import prisma from "../lib/prisma.js";
 import { AppError } from "../errors/AppError.js";
 import type { CreateTaskInput, UpdateTaskInput, ReorderTasksInput } from "./tasks.schemas.js";
+import { emitTaskNotification } from "../socket.js";
 
 const assigneeSelect = {
   id: true,
@@ -201,7 +202,7 @@ export async function getTaskById(
 }
 
 export async function createTask(
-  user: { id: number; role: string },
+  user: { id: number; role: string; name?: string },
   projectId: number,
   input: CreateTaskInput
 ) {
@@ -262,11 +263,43 @@ export async function createTask(
     },
   });
 
+  const recipientUserIds: number[] = [];
+  if (task.assignedTo?.id) {
+    recipientUserIds.push(task.assignedTo.id);
+  }
+
+  const members = await prisma.projectMember.findMany({
+    where: { projectId: task.projectId },
+    select: { userId: true },
+  });
+  members.forEach((m) => {
+    if (!recipientUserIds.includes(m.userId)) {
+      recipientUserIds.push(m.userId);
+    }
+  });
+
+  emitTaskNotification({
+    action: task.assignedTo?.id ? "ASSIGNED" : "CREATED",
+    taskId: task.id,
+    taskTitle: task.title,
+    projectId: task.projectId,
+    projectName: task.project.name,
+    message: task.assignedTo?.id
+      ? `Task "${task.title}" was assigned to ${task.assignedTo.name || "you"}`
+      : `New task "${task.title}" was created in project "${task.project.name}"`,
+    updatedBy: {
+      id: user.id,
+      name: user.name || "Admin",
+    },
+    task,
+    recipientUserIds,
+  }).catch((err) => console.error("Failed to emit task notification:", err));
+
   return task;
 }
 
 export async function updateTask(
-  user: { id: number; role: string },
+  user: { id: number; role: string; name?: string },
   projectId: number,
   taskId: number,
   input: UpdateTaskInput
@@ -275,6 +308,10 @@ export async function updateTask(
 
   const existingTask = await prisma.task.findFirst({
     where: { id: taskId, projectId },
+    include: {
+      assignedTo: { select: { id: true, name: true } },
+      project: { select: { id: true, name: true } },
+    },
   });
 
   if (!existingTask) {
@@ -327,11 +364,70 @@ export async function updateTask(
     },
   });
 
+  // Determine notification type
+  const isNewlyAssigned =
+    input.assignedToId !== undefined &&
+    input.assignedToId !== null &&
+    input.assignedToId !== existingTask.assignedToId;
+
+  const isCompleted =
+    input.status !== undefined &&
+    input.status === "COMPLETED" &&
+    existingTask.status !== "COMPLETED";
+
+  let action: "ASSIGNED" | "COMPLETED" | "UPDATED" = "UPDATED";
+  let message = `Task "${updatedTask.title}" was updated`;
+
+  if (isCompleted) {
+    action = "COMPLETED";
+    message = `Task "${updatedTask.title}" was marked as completed!`;
+  } else if (isNewlyAssigned) {
+    action = "ASSIGNED";
+    message = `Task "${updatedTask.title}" was assigned to ${updatedTask.assignedTo?.name || "you"}`;
+  } else if (input.status && input.status !== existingTask.status) {
+    const formatStatus = (s: string) =>
+      s === "IN_PROGRESS" ? "In Progress" : s === "COMPLETED" ? "Completed" : "Pending";
+    message = `Task "${updatedTask.title}" status changed to ${formatStatus(input.status)}`;
+  }
+
+  const recipientUserIds: number[] = [];
+  if (updatedTask.assignedTo?.id) {
+    recipientUserIds.push(updatedTask.assignedTo.id);
+  }
+  if (existingTask.assignedToId && !recipientUserIds.includes(existingTask.assignedToId)) {
+    recipientUserIds.push(existingTask.assignedToId);
+  }
+
+  const members = await prisma.projectMember.findMany({
+    where: { projectId: updatedTask.projectId },
+    select: { userId: true },
+  });
+  members.forEach((m) => {
+    if (!recipientUserIds.includes(m.userId)) {
+      recipientUserIds.push(m.userId);
+    }
+  });
+
+  emitTaskNotification({
+    action,
+    taskId: updatedTask.id,
+    taskTitle: updatedTask.title,
+    projectId: updatedTask.projectId,
+    projectName: updatedTask.project.name,
+    message,
+    updatedBy: {
+      id: user.id,
+      name: user.name || "Admin",
+    },
+    task: updatedTask,
+    recipientUserIds,
+  }).catch((err) => console.error("Failed to emit task notification:", err));
+
   return updatedTask;
 }
 
 export async function reorderTasks(
-  user: { id: number; role: string },
+  user: { id: number; role: string; name?: string },
   projectId: number | undefined,
   input: ReorderTasksInput
 ) {
@@ -339,8 +435,21 @@ export async function reorderTasks(
     await checkProjectAccess(user, projectId);
   }
 
+  // Fetch the tasks to know their titles, assignees, and projects
+  const tasksToReorder = await prisma.task.findMany({
+    where: { id: { in: input.taskIds } },
+    select: {
+      id: true,
+      title: true,
+      assignedToId: true,
+      assignedTo: { select: { id: true, name: true } },
+      projectId: true,
+      project: { select: { id: true, name: true } },
+    },
+  });
+
   // Update positions in a transaction
-  return prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx) => {
     const updates = input.taskIds.map((taskId, index) =>
       tx.task.update({
         where: { id: taskId },
@@ -355,10 +464,62 @@ export async function reorderTasks(
 
     return Promise.all(updates);
   });
+
+  const recipientUserIds: number[] = [];
+  const projectIds = new Set<number>();
+  const assignedNames: string[] = [];
+
+  tasksToReorder.forEach((t) => {
+    if (t.assignedToId && !recipientUserIds.includes(t.assignedToId)) {
+      recipientUserIds.push(t.assignedToId);
+      if (t.assignedTo?.name) {
+        assignedNames.push(t.assignedTo.name);
+      }
+    }
+    if (t.projectId) {
+      projectIds.add(t.projectId);
+    }
+  });
+
+  if (projectIds.size > 0) {
+    const members = await prisma.projectMember.findMany({
+      where: { projectId: { in: Array.from(projectIds) } },
+      select: { userId: true },
+    });
+    members.forEach((m) => {
+      if (!recipientUserIds.includes(m.userId)) {
+        recipientUserIds.push(m.userId);
+      }
+    });
+  }
+
+  const firstTask = tasksToReorder[0];
+  const projectName = firstTask?.project?.name;
+
+  let message = `Task order was changed`;
+  if (projectName) {
+    message = `Task order was changed in project "${projectName}"`;
+  }
+
+  // Emit reorder notification
+  emitTaskNotification({
+    action: "REORDERED",
+    projectId: projectId || firstTask?.projectId,
+    projectName,
+    message,
+    updatedBy: {
+      id: user.id,
+      name: user.name || "Admin",
+    },
+    reorderedTaskIds: input.taskIds,
+    recipientUserIds,
+  }).catch((err) => console.error("Failed to emit task notification:", err));
+
+  return updated;
 }
 
 export async function deleteTask(
-  user: { id: number; role: string },
+  user: { id: number; role: string; name?: string },
   projectId: number,
   taskId: number
 ) {
@@ -366,7 +527,7 @@ export async function deleteTask(
 
   const existingTask = await prisma.task.findFirst({
     where: { id: taskId, projectId },
-    select: { id: true },
+    select: { id: true, title: true, assignedToId: true, project: { select: { name: true } } },
   });
 
   if (!existingTask) {
@@ -376,4 +537,33 @@ export async function deleteTask(
   await prisma.task.delete({
     where: { id: taskId },
   });
+
+  const recipientUserIds: number[] = [];
+  if (existingTask.assignedToId) {
+    recipientUserIds.push(existingTask.assignedToId);
+  }
+
+  const members = await prisma.projectMember.findMany({
+    where: { projectId },
+    select: { userId: true },
+  });
+  members.forEach((m) => {
+    if (!recipientUserIds.includes(m.userId)) {
+      recipientUserIds.push(m.userId);
+    }
+  });
+
+  emitTaskNotification({
+    action: "DELETED",
+    taskId,
+    taskTitle: existingTask.title,
+    projectId,
+    projectName: existingTask.project?.name,
+    message: `Task "${existingTask.title}" was deleted`,
+    updatedBy: {
+      id: user.id,
+      name: user.name || "Admin",
+    },
+    recipientUserIds,
+  }).catch((err) => console.error("Failed to emit task notification:", err));
 }

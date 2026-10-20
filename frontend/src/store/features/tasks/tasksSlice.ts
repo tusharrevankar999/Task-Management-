@@ -163,6 +163,60 @@ const tasksSlice = createSlice({
     setAllTasksOrder: (state, action: PayloadAction<Task[]>) => {
       state.allTasks = action.payload;
     },
+    // Real-time Socket Event Handlers
+    onTaskCreatedOrAssigned: (state, action: PayloadAction<Task>) => {
+      const task = action.payload;
+      const exists = state.allTasks.some((t) => t.id === task.id);
+      if (!exists) {
+        state.allTasks = [task, ...state.allTasks];
+        state.pagination.total += 1;
+      }
+      if (task.projectId) {
+        const list = state.tasksByProject[task.projectId];
+        if (list && !list.some((t) => t.id === task.id)) {
+          state.tasksByProject[task.projectId] = [task, ...list];
+        }
+      }
+    },
+    onTaskUpdated: (state, action: PayloadAction<Task>) => {
+      const task = action.payload;
+      const allIdx = state.allTasks.findIndex((t) => t.id === task.id);
+      if (allIdx !== -1) {
+        state.allTasks[allIdx] = { ...state.allTasks[allIdx], ...task };
+      }
+      if (task.projectId) {
+        const list = state.tasksByProject[task.projectId];
+        if (list) {
+          const index = list.findIndex((t) => t.id === task.id);
+          if (index !== -1) {
+            list[index] = { ...list[index], ...task };
+          }
+        }
+      }
+    },
+    onTaskDeleted: (state, action: PayloadAction<{ taskId: number; projectId?: number }>) => {
+      const { taskId, projectId } = action.payload;
+      state.allTasks = state.allTasks.filter((t) => t.id !== taskId);
+      state.pagination.total = Math.max(0, state.pagination.total - 1);
+      if (projectId && state.tasksByProject[projectId]) {
+        state.tasksByProject[projectId] = state.tasksByProject[projectId].filter(
+          (t) => t.id !== taskId
+        );
+      }
+    },
+    onTasksReordered: (state, action: PayloadAction<{ taskIds: number[]; projectId?: number }>) => {
+      const { taskIds } = action.payload;
+      if (taskIds && taskIds.length > 0) {
+        const idToPos = new Map<number, number>();
+        taskIds.forEach((id, idx) => idToPos.set(id, idx));
+
+        state.allTasks = [...state.allTasks].sort((a, b) => {
+          const posA = idToPos.has(a.id) ? idToPos.get(a.id)! : a.position ?? 9999;
+          const posB = idToPos.has(b.id) ? idToPos.get(b.id)! : b.position ?? 9999;
+          return posA - posB;
+        });
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -202,10 +256,15 @@ const tasksSlice = createSlice({
       })
       .addCase(createTask.fulfilled, (state, action) => {
         state.isCreating = false;
-        state.allTasks = [action.payload.task, ...state.allTasks];
-        state.pagination.total += 1;
+        const exists = state.allTasks.some((t) => t.id === action.payload.task.id);
+        if (!exists) {
+          state.allTasks = [action.payload.task, ...state.allTasks];
+          state.pagination.total += 1;
+        }
         const currentTasks = state.tasksByProject[action.payload.projectId] || [];
-        state.tasksByProject[action.payload.projectId] = [action.payload.task, ...currentTasks];
+        if (!currentTasks.some((t) => t.id === action.payload.task.id)) {
+          state.tasksByProject[action.payload.projectId] = [action.payload.task, ...currentTasks];
+        }
       })
       .addCase(createTask.rejected, (state, action) => {
         state.isCreating = false;
@@ -262,5 +321,13 @@ const tasksSlice = createSlice({
   },
 });
 
-export const { clearTasksError, setAllTasksOrder } = tasksSlice.actions;
+export const {
+  clearTasksError,
+  setAllTasksOrder,
+  onTaskCreatedOrAssigned,
+  onTaskUpdated,
+  onTaskDeleted,
+  onTasksReordered,
+} = tasksSlice.actions;
+
 export default tasksSlice.reducer;

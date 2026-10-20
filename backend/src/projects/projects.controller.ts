@@ -50,11 +50,11 @@ export async function createProjectHandler(
 ): Promise<void> {
   try {
     const input = createProjectSchema.parse(req.body);
-    const userId = Number((req as any).user?.id);
-    if (!userId || isNaN(userId)) {
-      throw AppError.unauthorized("User ID is missing or invalid");
+    const user = req.user;
+    if (!user) {
+      throw AppError.unauthorized("Authentication required");
     }
-    const project = await projectsService.createProject(input, userId);
+    const project = await projectsService.createProject(input, user);
     res.status(201).json({ project });
   } catch (err) {
     next(err);
@@ -69,7 +69,8 @@ export async function updateProjectHandler(
   try {
     const id = parseProjectId(req.params["id"]);
     const input = updateProjectSchema.parse(req.body);
-    const project = await projectsService.updateProject(id, input);
+    const user = req.user;
+    const project = await projectsService.updateProject(id, input, user);
     res.json({ project });
   } catch (err) {
     next(err);
