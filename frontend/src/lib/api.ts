@@ -111,6 +111,11 @@ export const tasksApi = {
   ) =>
     api.patch<{ data: import('../types').Task }>(`/projects/${projectId}/tasks/${taskId}`, payload),
 
+  reorder: (taskIds: number[], projectId?: number | string) => {
+    const url = projectId ? `/projects/${projectId}/tasks/reorder` : '/tasks/reorder';
+    return api.put<{ success: boolean; count: number }>(url, { taskIds });
+  },
+
   delete: (projectId: number | string, taskId: number | string) =>
     api.delete(`/projects/${projectId}/tasks/${taskId}`),
 };

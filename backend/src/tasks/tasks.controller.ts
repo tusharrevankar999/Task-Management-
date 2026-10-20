@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import * as tasksService from "./tasks.service.js";
-import { createTaskSchema, updateTaskSchema } from "./tasks.schemas.js";
+import { createTaskSchema, updateTaskSchema, reorderTasksSchema } from "./tasks.schemas.js";
 import { AppError } from "../errors/AppError.js";
 
 function parseProjectId(rawId: string | string[] | undefined): number {
@@ -131,6 +131,29 @@ export async function updateTaskHandler(
     const updatedTask = await tasksService.updateTask(user, projectId, taskId, input);
 
     res.json({ data: updatedTask });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function reorderTasksHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw AppError.unauthorized("Authentication required");
+    }
+
+    const rawProjectId = req.params["projectId"];
+    const projectId = rawProjectId ? parseProjectId(rawProjectId) : undefined;
+    const input = reorderTasksSchema.parse(req.body);
+
+    const updated = await tasksService.reorderTasks(user, projectId, input);
+
+    res.json({ success: true, count: updated.length });
   } catch (err) {
     next(err);
   }
