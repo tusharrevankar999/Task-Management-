@@ -138,8 +138,6 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = useState<'ALL' | TaskStatus>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | TaskPriority>('ALL');
   const [dueDateFilter, setDueDateFilter] = useState<'ALL' | 'OVERDUE' | 'TODAY' | 'HAS_DUE_DATE' | 'NO_DUE_DATE'>('ALL');
-  const [sortBy, setSortBy] = useState<'default' | 'dueDate' | 'priority' | 'createdAt' | 'title'>('default');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -176,11 +174,9 @@ export default function TasksPage() {
         status: statusFilter === 'ALL' ? undefined : statusFilter,
         priority: priorityFilter === 'ALL' ? undefined : priorityFilter,
         dueDate: dueDateFilter === 'ALL' ? undefined : dueDateFilter,
-        sortBy: sortBy === 'default' ? undefined : sortBy,
-        sortOrder: sortBy === 'default' ? undefined : sortOrder,
       })
     );
-  }, [dispatch, page, debouncedSearch, statusFilter, priorityFilter, dueDateFilter, sortBy, sortOrder, viewMode]);
+  }, [dispatch, page, debouncedSearch, statusFilter, priorityFilter, dueDateFilter, viewMode]);
 
   // Calculate live statistics for summary cards
   const stats = useMemo(() => {
@@ -454,8 +450,6 @@ export default function TasksPage() {
           status: statusFilter === 'ALL' ? undefined : statusFilter,
           priority: priorityFilter === 'ALL' ? undefined : priorityFilter,
           dueDate: dueDateFilter === 'ALL' ? undefined : dueDateFilter,
-          sortBy: sortBy === 'default' ? undefined : sortBy,
-          sortOrder: sortBy === 'default' ? undefined : sortOrder,
         })
       );
     } catch (err: any) {
@@ -705,6 +699,8 @@ export default function TasksPage() {
             </select>
           </div>
 
+          {/* Sort by control (commented out) */}
+          {/*
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Sort by:</span>
             <select
@@ -732,6 +728,7 @@ export default function TasksPage() {
               </button>
             )}
           </div>
+          */}
         </div>
       </div>
 
