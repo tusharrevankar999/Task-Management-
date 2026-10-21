@@ -79,13 +79,18 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
+  const [avatarOpen, setAvatarOpen] = useState(false);
   const bellRef = useRef<HTMLDivElement>(null);
+  const avatarRef = useRef<HTMLDivElement>(null);
 
-  // Close notifications dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (bellRef.current && !bellRef.current.contains(event.target as Node)) {
         setBellOpen(false);
+      }
+      if (avatarRef.current && !avatarRef.current.contains(event.target as Node)) {
+        setAvatarOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -347,9 +352,65 @@ export default function AppLayout() {
             <span className="badge-user hidden sm:inline-flex">User</span>
           )}
 
-          {/* Avatar */}
-          <div className="w-9 h-9 rounded-full bg-gray-900 flex items-center justify-center text-white text-sm font-semibold">
-            {initials}
+          {/* Avatar & User Details Dropdown */}
+          <div className="relative" ref={avatarRef}>
+            <button
+              id="user-avatar-btn"
+              onClick={() => setAvatarOpen(!avatarOpen)}
+              className="w-9 h-9 rounded-full bg-gray-900 flex items-center justify-center text-white text-sm font-semibold hover:ring-2 hover:ring-gray-900/30 transition-all focus:outline-none cursor-pointer"
+              title="Account details"
+            >
+              {initials}
+            </button>
+
+            {avatarOpen && (
+              <div className="absolute right-0 mt-2.5 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 p-5 z-50 animate-in fade-in zoom-in-95 duration-150">
+                {/* Active Session badge */}
+                <div className="mb-4">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold text-emerald-700 bg-emerald-50 tracking-wider uppercase">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Active Session
+                  </span>
+                </div>
+
+                {/* User avatar + name + email */}
+                <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
+                  <div className="w-12 h-12 rounded-full bg-gray-900 flex items-center justify-center text-white text-base font-bold shrink-0 shadow-sm">
+                    {initials}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-gray-900 text-sm truncate">
+                      {user?.name ?? 'User'}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate mt-0.5">
+                      {user?.email ?? '—'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Details list */}
+                <div className="py-3.5 space-y-2.5 text-xs border-b border-gray-100 mb-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-500 font-medium">Role</span>
+                    <span className="font-semibold text-gray-900 capitalize">
+                      {user?.role === 'admin' ? 'Administrator' : 'Standard User'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Log Out button */}
+                <button
+                  onClick={() => {
+                    setAvatarOpen(false);
+                    handleLogout();
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-rose-50 hover:bg-rose-100/90 text-rose-600 font-bold text-sm rounded-full transition-all duration-200 cursor-pointer active:scale-[0.98]"
+                >
+                  <LogOut size={16} />
+                  <span>Log Out</span>
+                </button>
+              </div>
+            )}
           </div>
         </header>
 

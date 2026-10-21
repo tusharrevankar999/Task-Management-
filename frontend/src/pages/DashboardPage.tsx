@@ -18,11 +18,14 @@ export default function DashboardPage() {
           { label: 'Your Role', value: user?.role === 'admin' ? 'Administrator' : 'Standard User', color: 'text-gray-900' },
           { label: 'Email', value: user?.email ?? '—', color: 'text-gray-700' },
         ].map((card) => (
-          <div key={card.label} className="card px-6 py-5">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+          <div
+            key={card.label}
+            className="bg-white rounded-2xl border-2 border-gray-200 hover:border-black px-7 py-8 min-h-[140px] flex flex-col justify-center cursor-pointer transition-all duration-200 hover:shadow-md"
+          >
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
               {card.label}
             </p>
-            <p className={`text-lg font-semibold ${card.color} truncate`}>
+            <p className={`text-xl font-bold ${card.color} truncate`}>
               {card.value}
             </p>
           </div>

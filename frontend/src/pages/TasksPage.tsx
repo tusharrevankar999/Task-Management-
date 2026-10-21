@@ -476,22 +476,18 @@ export default function TasksPage() {
             setStatusFilter('ALL');
             setPage(1);
           }}
-          className={`bg-white rounded-2xl p-5 border cursor-pointer transition-all duration-200 hover:shadow-md flex items-center justify-between ${
-            statusFilter === 'ALL'
-              ? 'border-gray-900 ring-2 ring-gray-900/10 shadow-sm'
-              : 'border-2 border-gray-200 hover:border-black'
-          }`}
+          className="bg-white rounded-2xl px-6 py-8 min-h-[140px] border-2 border-gray-200 hover:border-black cursor-pointer transition-all duration-200 hover:shadow-md flex items-center justify-between"
         >
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
               Total Tasks
             </p>
-            <p className="text-2xl font-extrabold text-gray-900 mt-1">
+            <p className="text-3xl font-extrabold text-gray-900 mt-2">
               {stats.total}
             </p>
           </div>
-          <div className="w-11 h-11 rounded-2xl bg-gray-100/80 flex items-center justify-center text-gray-700 shrink-0">
-            <Calendar size={20} />
+          <div className="w-12 h-12 rounded-2xl bg-gray-100/80 flex items-center justify-center text-gray-700 shrink-0">
+            <Calendar size={22} />
           </div>
         </div>
 
@@ -501,22 +497,22 @@ export default function TasksPage() {
             setStatusFilter('IN_PROGRESS');
             setPage(1);
           }}
-          className={`bg-white rounded-2xl p-5 border cursor-pointer transition-all duration-200 hover:shadow-md flex items-center justify-between ${
+          className={`bg-white rounded-2xl px-6 py-8 min-h-[140px] border cursor-pointer transition-all duration-200 hover:shadow-md flex items-center justify-between ${
             statusFilter === 'IN_PROGRESS'
               ? 'border-2 border-blue-600 ring-2 ring-blue-500/20 shadow-sm'
               : 'border-2 border-gray-200 hover:border-black'
           }`}
         >
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
               In Progress
             </p>
-            <p className="text-2xl font-extrabold text-blue-600 mt-1">
+            <p className="text-3xl font-extrabold text-blue-600 mt-2">
               {stats.inProgress}
             </p>
           </div>
-          <div className="w-11 h-11 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
-            <Clock size={20} />
+          <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+            <Clock size={22} />
           </div>
         </div>
 
@@ -526,22 +522,22 @@ export default function TasksPage() {
             setStatusFilter('PENDING');
             setPage(1);
           }}
-          className={`bg-white rounded-2xl p-5 border cursor-pointer transition-all duration-200 hover:shadow-md flex items-center justify-between ${
+          className={`bg-white rounded-2xl px-6 py-8 min-h-[140px] border cursor-pointer transition-all duration-200 hover:shadow-md flex items-center justify-between ${
             statusFilter === 'PENDING'
               ? 'border-2 border-amber-500 ring-2 ring-amber-500/20 shadow-sm'
               : 'border-2 border-gray-200 hover:border-black'
           }`}
         >
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
               Pending
             </p>
-            <p className="text-2xl font-extrabold text-amber-600 mt-1">
+            <p className="text-3xl font-extrabold text-amber-600 mt-2">
               {stats.pending}
             </p>
           </div>
-          <div className="w-11 h-11 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
-            <Clock size={20} />
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
+            <Clock size={22} />
           </div>
         </div>
 
@@ -551,22 +547,22 @@ export default function TasksPage() {
             setStatusFilter('COMPLETED');
             setPage(1);
           }}
-          className={`bg-white rounded-2xl p-5 border cursor-pointer transition-all duration-200 hover:shadow-md flex items-center justify-between ${
+          className={`bg-white rounded-2xl px-6 py-8 min-h-[140px] border cursor-pointer transition-all duration-200 hover:shadow-md flex items-center justify-between ${
             statusFilter === 'COMPLETED'
               ? 'border-2 border-emerald-600 ring-2 ring-emerald-500/20 shadow-sm'
               : 'border-2 border-gray-200 hover:border-black'
           }`}
         >
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
               Completed Tasks
             </p>
-            <p className="text-2xl font-extrabold text-emerald-600 mt-1">
+            <p className="text-3xl font-extrabold text-emerald-600 mt-2">
               {stats.completed}
             </p>
           </div>
-          <div className="w-11 h-11 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
-            <CheckCircle2 size={20} />
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+            <CheckCircle2 size={22} />
           </div>
         </div>
       </div>

@@ -499,15 +499,18 @@ export default function UsersPage() {
       </div>
 
       {/* Stats strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-5 mb-6">
         {[
           { label: 'Total Users', value: users.length },
           { label: 'Active', value: users.filter((u) => u.isActive).length },
           { label: 'Admins', value: users.filter((u) => u.role === 'admin').length },
         ].map((s) => (
-          <div key={s.label} className="card px-5 py-4">
-            <p className="text-2xl font-bold text-gray-900">{s.value}</p>
-            <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+          <div
+            key={s.label}
+            className="bg-white rounded-2xl border-2 border-gray-200 hover:border-black px-7 py-8 min-h-[140px] flex flex-col justify-center cursor-pointer transition-all duration-200 hover:shadow-md"
+          >
+            <p className="text-3xl font-extrabold text-gray-900 tracking-tight">{s.value}</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mt-2">{s.label}</p>
           </div>
         ))}
       </div>
