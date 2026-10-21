@@ -52,7 +52,17 @@ export async function checkProjectAccess(
 
 export async function listAllTasks(
   user: { id: number; role: string },
-  options?: { page?: number; limit?: number; search?: string; status?: string; projectId?: number }
+  options?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    priority?: string;
+    dueDate?: string;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+    projectId?: number;
+  }
 ) {
   const page = Math.max(1, options?.page ?? 1);
   const limit = Math.max(1, Math.min(100, options?.limit ?? 10));
@@ -78,6 +88,27 @@ export async function listAllTasks(
     where.status = options.status;
   }
 
+  if (options?.priority && ["LOW", "MEDIUM", "HIGH"].includes(options.priority.toUpperCase())) {
+    where.priority = options.priority.toUpperCase();
+  }
+
+  if (options?.dueDate) {
+    if (options.dueDate === "OVERDUE") {
+      where.dueDate = { lt: new Date(), not: null };
+      where.status = { not: "COMPLETED" };
+    } else if (options.dueDate === "TODAY") {
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+      where.dueDate = { gte: startOfDay, lte: endOfDay };
+    } else if (options.dueDate === "HAS_DUE_DATE") {
+      where.dueDate = { not: null };
+    } else if (options.dueDate === "NO_DUE_DATE") {
+      where.dueDate = null;
+    }
+  }
+
   if (options?.search) {
     const q = options.search.trim();
     if (q) {
@@ -96,16 +127,33 @@ export async function listAllTasks(
       where,
       skip,
       take: limit,
-      orderBy: [
-        { position: "asc" },
-        { createdAt: "desc" },
-        { id: "desc" },
-      ],
+      orderBy: (() => {
+        const order = options?.sortOrder === "asc" ? "asc" : "desc";
+        if (options?.sortBy === "dueDate") {
+          return [{ dueDate: order }, { position: "asc" }];
+        }
+        if (options?.sortBy === "priority") {
+          return [{ priority: order }, { position: "asc" }];
+        }
+        if (options?.sortBy === "title") {
+          return [{ title: order }];
+        }
+        if (options?.sortBy === "createdAt") {
+          return [{ createdAt: order }];
+        }
+        return [
+          { position: "asc" },
+          { createdAt: "desc" },
+          { id: "desc" },
+        ];
+      })(),
       select: {
         id: true,
         title: true,
         description: true,
         status: true,
+        priority: true,
+        dueDate: true,
         position: true,
         projectId: true,
         project: {
@@ -240,6 +288,8 @@ export async function createTask(
       title: input.title,
       description: input.description ?? null,
       status: "PENDING",
+      priority: input.priority ?? "MEDIUM",
+      dueDate: input.dueDate ?? null,
       position: nextPosition,
       projectId,
       createdById: user.id,
@@ -343,6 +393,8 @@ export async function updateTask(
       ...(input.title !== undefined ? { title: input.title } : {}),
       ...(input.description !== undefined ? { description: input.description } : {}),
       ...(input.status !== undefined ? { status: input.status } : {}),
+      ...(input.priority !== undefined ? { priority: input.priority } : {}),
+      ...(input.dueDate !== undefined ? { dueDate: input.dueDate } : {}),
       ...(input.position !== undefined ? { position: input.position } : {}),
       ...(input.assignedToId !== undefined ? { assignedToId: input.assignedToId } : {}),
     },

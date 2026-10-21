@@ -36,6 +36,10 @@ export async function listAllTasksHandler(
     const limit = req.query["limit"] ? Number(req.query["limit"]) : 10;
     const search = typeof req.query["search"] === "string" ? req.query["search"] : undefined;
     const status = typeof req.query["status"] === "string" ? req.query["status"] : undefined;
+    const priority = typeof req.query["priority"] === "string" ? req.query["priority"] : undefined;
+    const dueDate = typeof req.query["dueDate"] === "string" ? req.query["dueDate"] : undefined;
+    const sortBy = typeof req.query["sortBy"] === "string" ? req.query["sortBy"] : undefined;
+    const sortOrder = req.query["sortOrder"] === "asc" || req.query["sortOrder"] === "desc" ? req.query["sortOrder"] : undefined;
     const projectId = req.query["projectId"] ? Number(req.query["projectId"]) : undefined;
 
     const result = await tasksService.listAllTasks(user, {
@@ -43,6 +47,10 @@ export async function listAllTasksHandler(
       limit,
       search,
       status,
+      priority,
+      dueDate,
+      sortBy,
+      sortOrder,
       projectId: isNaN(projectId as number) ? undefined : projectId,
     });
 

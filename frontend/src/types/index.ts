@@ -101,6 +101,7 @@ export interface UpdateProjectPayload {
 // ─── Task types ─────────────────────────────────────────────────────────────
 
 export type TaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
+export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH';
 
 export interface TaskAssignee {
   id: number;
@@ -112,6 +113,8 @@ export interface Task {
   title: string;
   description: string | null;
   status: TaskStatus;
+  priority: TaskPriority;
+  dueDate?: string | null;
   position?: number;
   projectId: number;
   project?: {
@@ -126,6 +129,8 @@ export interface Task {
 export interface CreateTaskPayload {
   title: string;
   description?: string | null;
+  priority?: TaskPriority;
+  dueDate?: string | null;
   assignedToId?: number | null;
 }
 
@@ -133,6 +138,8 @@ export interface UpdateTaskPayload {
   title?: string;
   description?: string | null;
   status?: TaskStatus;
+  priority?: TaskPriority;
+  dueDate?: string | null;
   assignedToId?: number | null;
   position?: number;
 }

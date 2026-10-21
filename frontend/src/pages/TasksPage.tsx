@@ -34,7 +34,7 @@ import {
   reorderTasks,
   setAllTasksOrder,
 } from '../store/features/tasks/tasksSlice';
-import type { Task, TaskStatus } from '../types';
+import type { Task, TaskStatus, TaskPriority } from '../types';
 
 // ─── Zod Schema for Task Modal (Create & Edit) ──────────────────────────────
 
@@ -47,10 +47,39 @@ const taskFormSchema = z.object({
     .max(255, 'Max 255 characters'),
   description: z.string().max(2000, 'Max 2000 characters').optional(),
   status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED']),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH']),
+  dueDate: z.string().optional(),
   assignedToId: z.string().optional(),
 });
 
 type TaskFormValues = z.infer<typeof taskFormSchema>;
+
+export const priorityBadgeConfig: Record<
+  TaskPriority,
+  { label: string; bg: string; text: string; border: string; dot: string }
+> = {
+  LOW: {
+    label: 'Low',
+    bg: 'bg-slate-50',
+    text: 'text-slate-700',
+    border: 'border-slate-200',
+    dot: 'bg-slate-400',
+  },
+  MEDIUM: {
+    label: 'Medium',
+    bg: 'bg-amber-50',
+    text: 'text-amber-700',
+    border: 'border-amber-200',
+    dot: 'bg-amber-500',
+  },
+  HIGH: {
+    label: 'High',
+    bg: 'bg-rose-50',
+    text: 'text-rose-700',
+    border: 'border-rose-200',
+    dot: 'bg-rose-500',
+  },
+};
 
 const statusBadgeConfig: Record<
   TaskStatus,
@@ -107,6 +136,10 @@ export default function TasksPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | TaskStatus>('ALL');
+  const [priorityFilter, setPriorityFilter] = useState<'ALL' | TaskPriority>('ALL');
+  const [dueDateFilter, setDueDateFilter] = useState<'ALL' | 'OVERDUE' | 'TODAY' | 'HAS_DUE_DATE' | 'NO_DUE_DATE'>('ALL');
+  const [sortBy, setSortBy] = useState<'default' | 'dueDate' | 'priority' | 'createdAt' | 'title'>('default');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -141,9 +174,13 @@ export default function TasksPage() {
         limit: viewMode === 'board' ? 100 : 10,
         search: debouncedSearch || undefined,
         status: statusFilter === 'ALL' ? undefined : statusFilter,
+        priority: priorityFilter === 'ALL' ? undefined : priorityFilter,
+        dueDate: dueDateFilter === 'ALL' ? undefined : dueDateFilter,
+        sortBy: sortBy === 'default' ? undefined : sortBy,
+        sortOrder: sortBy === 'default' ? undefined : sortOrder,
       })
     );
-  }, [dispatch, page, debouncedSearch, statusFilter, viewMode]);
+  }, [dispatch, page, debouncedSearch, statusFilter, priorityFilter, dueDateFilter, sortBy, sortOrder, viewMode]);
 
   // Calculate live statistics for summary cards
   const stats = useMemo(() => {
@@ -168,6 +205,8 @@ export default function TasksPage() {
       title: '',
       description: '',
       status: 'PENDING',
+      priority: 'MEDIUM',
+      dueDate: '',
       assignedToId: '',
     },
   });
@@ -194,6 +233,8 @@ export default function TasksPage() {
       title: '',
       description: '',
       status: defaultStatus,
+      priority: 'MEDIUM',
+      dueDate: '',
       assignedToId: '',
     });
     setIsModalOpen(true);
@@ -207,6 +248,8 @@ export default function TasksPage() {
       title: task.title,
       description: task.description || '',
       status: task.status,
+      priority: task.priority || 'MEDIUM',
+      dueDate: task.dueDate ? task.dueDate.slice(0, 10) : '',
       assignedToId: task.assignedTo ? String(task.assignedTo.id) : '',
     });
     setIsModalOpen(true);
@@ -364,6 +407,8 @@ export default function TasksPage() {
       const assignedId = values.assignedToId ? Number(values.assignedToId) : null;
       const targetProjId = Number(values.projectId || editingTask?.projectId || projects[0]?.id);
 
+      const dueDateValue = values.dueDate ? values.dueDate : null;
+
       if (editingTask) {
         await dispatch(
           updateTask({
@@ -373,6 +418,8 @@ export default function TasksPage() {
               title: values.title.trim(),
               description: values.description?.trim() || null,
               status: values.status,
+              priority: values.priority,
+              dueDate: dueDateValue,
               assignedToId: assignedId,
             },
           })
@@ -385,6 +432,8 @@ export default function TasksPage() {
             payload: {
               title: values.title.trim(),
               description: values.description?.trim() || null,
+              priority: values.priority,
+              dueDate: dueDateValue,
               assignedToId: assignedId,
             },
           })
@@ -403,6 +452,10 @@ export default function TasksPage() {
           limit: viewMode === 'board' ? 100 : 10,
           search: debouncedSearch || undefined,
           status: statusFilter === 'ALL' ? undefined : statusFilter,
+          priority: priorityFilter === 'ALL' ? undefined : priorityFilter,
+          dueDate: dueDateFilter === 'ALL' ? undefined : dueDateFilter,
+          sortBy: sortBy === 'default' ? undefined : sortBy,
+          sortOrder: sortBy === 'default' ? undefined : sortOrder,
         })
       );
     } catch (err: any) {
@@ -567,42 +620,118 @@ export default function TasksPage() {
         </div>
       </div>
 
-      {/* ── Search & Filter Tabs Bar ───────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-        {/* Status Pill Filters */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {(['ALL', 'PENDING', 'IN_PROGRESS', 'COMPLETED'] as const).map((st) => (
-            <button
-              key={st}
-              onClick={() => {
-                setStatusFilter(st);
-                setPage(1);
-              }}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition ${
-                statusFilter === st
-                  ? 'bg-gray-900 text-white shadow-xs font-bold'
-                  : 'bg-gray-100/80 text-gray-600 hover:text-gray-900 hover:bg-gray-200/70'
-              }`}
-            >
-              {st === 'ALL'
-                ? 'All'
-                : st === 'IN_PROGRESS'
-                ? 'In Progress'
-                : st.charAt(0) + st.slice(1).toLowerCase()}
-            </button>
-          ))}
+      {/* ── Search, Filters & Sorting Bar ─────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-xs space-y-3">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+          {/* Status & Priority Filter Pills */}
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Status Pills */}
+            <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-200/80">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2">Status</span>
+              {(['ALL', 'PENDING', 'IN_PROGRESS', 'COMPLETED'] as const).map((st) => (
+                <button
+                  key={st}
+                  onClick={() => {
+                    setStatusFilter(st);
+                    setPage(1);
+                  }}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
+                    statusFilter === st
+                      ? 'bg-gray-900 text-white shadow-xs font-bold'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/70'
+                  }`}
+                >
+                  {st === 'ALL'
+                    ? 'All'
+                    : st === 'IN_PROGRESS'
+                    ? 'In Progress'
+                    : st.charAt(0) + st.slice(1).toLowerCase()}
+                </button>
+              ))}
+            </div>
+
+            {/* Priority Pills */}
+            <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-200/80">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2">Priority</span>
+              {(['ALL', 'LOW', 'MEDIUM', 'HIGH'] as const).map((pr) => (
+                <button
+                  key={pr}
+                  onClick={() => {
+                    setPriorityFilter(pr);
+                    setPage(1);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
+                    priorityFilter === pr
+                      ? 'bg-gray-900 text-white shadow-xs font-bold'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/70'
+                  }`}
+                >
+                  {pr === 'ALL' ? 'All' : pr.charAt(0) + pr.slice(1).toLowerCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Search box */}
+          <div className="relative flex-1 max-w-sm">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by title, description, or assignee..."
+              className="w-full pl-8 pr-3 py-2 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:bg-white transition"
+            />
+          </div>
         </div>
 
-        {/* Search box */}
-        <div className="relative flex-1 max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by title, description, or assignee..."
-            className="w-full pl-8 pr-3 py-2 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:bg-white transition"
-          />
+        {/* Secondary controls row: Due Date Filter & Sorting */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-gray-100 text-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Due Date:</span>
+            <select
+              value={dueDateFilter}
+              onChange={(e) => {
+                setDueDateFilter(e.target.value as any);
+                setPage(1);
+              }}
+              className="px-2.5 py-1.5 bg-gray-50 rounded-lg border border-gray-200 text-xs text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+            >
+              <option value="ALL">All Deadlines</option>
+              <option value="TODAY">Due Today</option>
+              <option value="OVERDUE">Overdue</option>
+              <option value="HAS_DUE_DATE">Has Due Date</option>
+              <option value="NO_DUE_DATE">No Due Date</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Sort by:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => {
+                setSortBy(e.target.value as any);
+                setPage(1);
+              }}
+              className="px-2.5 py-1.5 bg-gray-50 rounded-lg border border-gray-200 text-xs text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+            >
+              <option value="default">Default (Drag & Drop Order)</option>
+              <option value="dueDate">Due Date</option>
+              <option value="priority">Priority</option>
+              <option value="createdAt">Date Created</option>
+              <option value="title">Title (A-Z)</option>
+            </select>
+
+            {sortBy !== 'default' && (
+              <button
+                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold text-xs transition"
+                title="Toggle Sort Order"
+              >
+                {sortOrder === 'asc' ? 'Asc ↑' : 'Desc ↓'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -714,6 +843,51 @@ export default function TasksPage() {
                             </p>
                           )}
 
+                          {/* Card Middle: Priority & Due Date Pills */}
+                          <div className="flex items-center gap-1.5 flex-wrap mb-2.5">
+                            {/* Priority Badge */}
+                            {task.priority && (
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                                  priorityBadgeConfig[task.priority]?.bg || 'bg-gray-50'
+                                } ${priorityBadgeConfig[task.priority]?.text || 'text-gray-700'} ${
+                                  priorityBadgeConfig[task.priority]?.border || 'border-gray-200'
+                                }`}
+                              >
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full ${
+                                    priorityBadgeConfig[task.priority]?.dot || 'bg-gray-400'
+                                  }`}
+                                />
+                                {priorityBadgeConfig[task.priority]?.label || task.priority}
+                              </span>
+                            )}
+
+                            {/* Due Date Badge */}
+                            {task.dueDate && (() => {
+                              const due = new Date(task.dueDate);
+                              const now = new Date();
+                              const isOverdue = due < now && task.status !== 'COMPLETED';
+                              const formattedDue = due.toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                              });
+                              return (
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
+                                    isOverdue
+                                      ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                      : 'bg-gray-50 text-gray-600 border-gray-200'
+                                  }`}
+                                  title={isOverdue ? 'Overdue!' : `Due on ${formattedDue}`}
+                                >
+                                  <Clock size={10} className={isOverdue ? 'text-rose-600' : 'text-gray-400'} />
+                                  <span>{isOverdue ? 'Overdue: ' : 'Due: '} {formattedDue}</span>
+                                </span>
+                              );
+                            })()}
+                          </div>
+
                           {/* Card Bottom: Assignee & Date */}
                           <div className="flex items-center justify-between pt-2.5 border-t border-gray-100 text-[11px] text-gray-500">
                             {task.assignedTo ? (
@@ -775,6 +949,8 @@ export default function TasksPage() {
                     <th className="py-3.5 px-4 w-10 text-center">Order</th>
                     <th className="py-3.5 px-6">Task Title & Description</th>
                     <th className="py-3.5 px-6">Project</th>
+                    <th className="py-3.5 px-4">Priority</th>
+                    <th className="py-3.5 px-4">Due Date</th>
                     <th className="py-3.5 px-6">Status</th>
                     <th className="py-3.5 px-6">Assignee</th>
                     <th className="py-3.5 px-6">Created Date</th>
@@ -784,6 +960,7 @@ export default function TasksPage() {
                 <tbody className="divide-y divide-gray-100 text-sm">
                   {allTasks.map((task, index) => {
                     const statusStyle = statusBadgeConfig[task.status] || statusBadgeConfig.PENDING;
+                    const priorityStyle = priorityBadgeConfig[task.priority] || priorityBadgeConfig.MEDIUM;
                     const formattedDate = new Date(task.createdAt).toLocaleDateString('en-US', {
                       month: 'short',
                       day: 'numeric',
@@ -844,6 +1021,44 @@ export default function TasksPage() {
                             <FolderKanban size={13} className="text-gray-500" />
                             {task.project ? task.project.name : `Project #${task.projectId}`}
                           </span>
+                        </td>
+
+                        {/* Priority */}
+                        <td className="py-4 px-4">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${priorityStyle.bg} ${priorityStyle.text} ${priorityStyle.border}`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${priorityStyle.dot}`} />
+                            {priorityStyle.label}
+                          </span>
+                        </td>
+
+                        {/* Due Date */}
+                        <td className="py-4 px-4 whitespace-nowrap text-xs">
+                          {task.dueDate ? (() => {
+                            const due = new Date(task.dueDate);
+                            const now = new Date();
+                            const isOverdue = due < now && task.status !== 'COMPLETED';
+                            const formattedDue = due.toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            });
+                            return (
+                              <span
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border ${
+                                  isOverdue
+                                    ? 'bg-rose-50 text-rose-700 border-rose-200 font-bold'
+                                    : 'bg-gray-50 text-gray-700 border-gray-200'
+                                }`}
+                              >
+                                <Clock size={12} className={isOverdue ? 'text-rose-600' : 'text-gray-400'} />
+                                <span>{formattedDue}</span>
+                              </span>
+                            );
+                          })() : (
+                            <span className="text-gray-400 italic text-[11px]">No deadline</span>
+                          )}
                         </td>
 
                         {/* Status */}
@@ -1028,19 +1243,52 @@ export default function TasksPage() {
                 )}
               </div>
 
-              {/* Status */}
+              {/* Status & Priority Row */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Status */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Status
+                  </label>
+                  <select
+                    {...register('status')}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:bg-white focus:border-gray-900 transition"
+                  >
+                    <option value="PENDING">Pending</option>
+                    <option value="IN_PROGRESS">In Progress</option>
+                    <option value="COMPLETED">Completed</option>
+                  </select>
+                </div>
+
+                {/* Priority */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Priority <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    {...register('priority')}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:bg-white focus:border-gray-900 transition font-medium"
+                  >
+                    <option value="LOW">Low</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="HIGH">High</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Due Date */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Status
+                  Due Date
                 </label>
-                <select
-                  {...register('status')}
+                <input
+                  type="date"
+                  {...register('dueDate')}
                   className="w-full px-3.5 py-2.5 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:bg-white focus:border-gray-900 transition"
-                >
-                  <option value="PENDING">Pending</option>
-                  <option value="IN_PROGRESS">In Progress</option>
-                  <option value="COMPLETED">Completed</option>
-                </select>
+                />
+                <p className="mt-1 text-[11px] text-gray-400">
+                  Optional deadline for this task.
+                </p>
               </div>
 
               {/* Description */}

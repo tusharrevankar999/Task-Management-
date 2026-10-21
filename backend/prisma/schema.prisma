@@ -17,6 +17,12 @@ enum TaskStatus {
   COMPLETED
 }
 
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
 enum Role {
   ADMIN
   USER
@@ -88,8 +94,10 @@ model Task {
   id           Int        @id @default(autoincrement())
   title        String
   description  String?
-  status       TaskStatus @default(PENDING)
-  position     Int        @default(0)
+  status       TaskStatus   @default(PENDING)
+  priority     TaskPriority @default(MEDIUM)
+  dueDate      DateTime?
+  position     Int          @default(0)
   projectId    Int
   project      Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
   assignedToId Int?

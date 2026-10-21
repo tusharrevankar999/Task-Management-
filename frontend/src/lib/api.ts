@@ -92,7 +92,17 @@ export const projectsApi = {
 // ─── Tasks endpoints ────────────────────────────────────────────────────────
 
 export const tasksApi = {
-  listAll: (params?: { page?: number; limit?: number; search?: string; status?: string; projectId?: number }) =>
+  listAll: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    priority?: string;
+    dueDate?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    projectId?: number;
+  }) =>
     api.get<{ data: import('../types').Task[]; pagination: import('../types').PaginationMeta }>('/tasks/all', { params }),
 
   list: (projectId: number | string) =>
