@@ -32,7 +32,19 @@ const initialState: TasksState = {
 export const fetchAllTasks = createAsyncThunk(
   'tasks/fetchAllTasks',
   async (
-    params: { page?: number; limit?: number; search?: string; status?: string; projectId?: number } | undefined,
+    params:
+      | {
+          page?: number;
+          limit?: number;
+          search?: string;
+          status?: string;
+          priority?: string;
+          dueDate?: string;
+          sortBy?: string;
+          sortOrder?: 'asc' | 'desc';
+          projectId?: number;
+        }
+      | undefined,
     { rejectWithValue }
   ) => {
     try {

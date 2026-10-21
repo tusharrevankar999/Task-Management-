@@ -16,6 +16,16 @@ export const createTaskSchema = z.object({
       const trimmed = val.trim();
       return trimmed.length === 0 ? null : trimmed;
     }),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH"]).optional().default("MEDIUM"),
+  dueDate: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((val) => {
+      if (!val) return null;
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d;
+    }),
   assignedToId: z.coerce
     .number()
     .int("assignedToId must be an integer")
@@ -46,6 +56,17 @@ export const updateTaskSchema = z
         return trimmed.length === 0 ? null : trimmed;
       }),
     status: z.enum(["PENDING", "IN_PROGRESS", "COMPLETED"]).optional(),
+    priority: z.enum(["LOW", "MEDIUM", "HIGH"]).optional(),
+    dueDate: z
+      .string()
+      .optional()
+      .nullable()
+      .transform((val) => {
+        if (val === undefined) return undefined;
+        if (val === null || val === "") return null;
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? null : d;
+      }),
     assignedToId: z.coerce
       .number()
       .int("assignedToId must be an integer")
